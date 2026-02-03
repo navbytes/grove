@@ -2,7 +2,7 @@
   "name": "grove",
   "displayName": "Grove",
   "description": "Manage cross-repository task workspaces with git worktrees",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "grove",
   "license": "MIT",
   "author": {
