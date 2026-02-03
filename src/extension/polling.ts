@@ -134,22 +134,23 @@ export class GrovePolling {
     client: ReturnType<typeof createGitHubClient>
   ): Promise<boolean> {
     let hasChanges = false;
+    // Store previous states for notifications (primary PR only)
     const previousStates = new Map<string, { reviewStatus: string; ciStatus: string; prStatus: string }>();
 
-    // Store previous states for notifications
     for (const project of task.projects) {
-      if (project.pr) {
+      if (project.prs.length > 0) {
+        const pr = project.prs[0];
         previousStates.set(project.name, {
-          reviewStatus: project.pr.reviewStatus,
-          ciStatus: project.pr.ciStatus,
-          prStatus: project.pr.status,
+          reviewStatus: pr.reviewStatus,
+          ciStatus: pr.ciStatus,
+          prStatus: pr.status,
         });
       }
     }
 
-    // Update each project
+    // Update each project's PRs
     for (const project of task.projects) {
-      if (!project.pr) {
+      if (project.prs.length === 0) {
         continue;
       }
 
@@ -161,30 +162,36 @@ export class GrovePolling {
       const owner = extractRepoOwner(remoteResult.data);
       const repo = extractRepoName(remoteResult.data);
 
-      if (!owner || repo) {
+      if (!owner || !repo) {
         continue;
       }
 
-      const prResult = await client.getPR(owner, repo!, project.pr.number);
-      if (!prResult.success || !prResult.data) {
-        continue;
-      }
+      // Update all PRs for this project
+      for (let i = 0; i < project.prs.length; i++) {
+        const prResult = await client.getPR(owner, repo, project.prs[i].number);
+        if (!prResult.success || !prResult.data) {
+          continue;
+        }
 
-      const newInfo = prDetailsToInfo(prResult.data);
-      const previousState = previousStates.get(project.name);
+        const newInfo = prDetailsToInfo(prResult.data);
+        const oldPr = project.prs[i];
 
-      // Check for changes
-      if (
-        project.pr.reviewStatus !== newInfo.reviewStatus ||
-        project.pr.ciStatus !== newInfo.ciStatus ||
-        project.pr.status !== newInfo.status
-      ) {
-        hasChanges = true;
-        project.pr = newInfo;
+        // Check for changes
+        if (
+          oldPr.reviewStatus !== newInfo.reviewStatus ||
+          oldPr.ciStatus !== newInfo.ciStatus ||
+          oldPr.status !== newInfo.status
+        ) {
+          hasChanges = true;
+          project.prs[i] = newInfo;
 
-        // Send notifications
-        if (previousState) {
-          await this.sendNotifications(task, project.name, previousState, newInfo);
+          // Send notifications for primary PR only
+          if (i === 0) {
+            const previousState = previousStates.get(project.name);
+            if (previousState) {
+              await this.sendNotifications(task, project.name, previousState, newInfo);
+            }
+          }
         }
       }
     }
@@ -220,8 +227,8 @@ export class GrovePolling {
       );
       if (action === 'Open PR') {
         const project = task.projects.find((p) => p.name === projectName);
-        if (project?.pr) {
-          vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+        if (project?.prs.length) {
+          vscode.env.openExternal(vscode.Uri.parse(project.prs[0].url));
         }
       }
     }

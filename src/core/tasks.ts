@@ -122,7 +122,7 @@ export async function createTask(options: CreateTaskOptions): Promise<OperationR
       worktreePath,
       branch,
       baseBranch: project.defaultBaseBranch,
-      pr: null,
+      prs: [],
     });
   }
 
@@ -228,7 +228,7 @@ export async function addProjectToTask(
     worktreePath,
     branch,
     baseBranch: project.defaultBaseBranch,
-    pr: null,
+    prs: [],
   };
 
   task.projects.push(taskProject);

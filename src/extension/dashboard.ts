@@ -167,8 +167,9 @@ export class GroveDashboardPanel {
           const project = taskResult.data.projects.find(
             (p) => p.name === message.projectName
           );
-          if (project?.pr?.url) {
-            vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+          if (project?.prs.length) {
+            // Open primary PR
+            vscode.env.openExternal(vscode.Uri.parse(project.prs[0].url));
           }
         }
         break;
@@ -182,8 +183,8 @@ export class GroveDashboardPanel {
             (p) => p.name === message.projectName
           );
           // For now, just open the PR page which has CI status
-          if (project?.pr?.url) {
-            vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+          if (project?.prs.length) {
+            vscode.env.openExternal(vscode.Uri.parse(project.prs[0].url));
           }
         }
         break;

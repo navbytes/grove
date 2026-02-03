@@ -80,7 +80,7 @@ export interface TaskProject {
   worktreePath: string;
   branch: string;
   baseBranch: string;
-  pr: PRInfo | null;
+  prs: PRInfo[];
 }
 
 /**

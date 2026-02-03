@@ -11,7 +11,7 @@
   let { project, taskId }: Props = $props();
 
   const handleOpenPR = () => {
-    if (project.pr) {
+    if (project.prs.length > 0) {
       vscode.postMessage({
         type: 'openPR',
         taskId,
@@ -37,7 +37,7 @@
   };
 
   const handleOpenCI = () => {
-    if (project.pr) {
+    if (project.prs.length > 0) {
       vscode.postMessage({
         type: 'openCI',
         taskId,
@@ -80,20 +80,21 @@
   </div>
 
   <div class="project-status">
-    {#if project.pr}
-      <button class="status-btn" onclick={handleOpenPR} title="Open PR #{project.pr.number}">
-        <span class="pr-number">#{project.pr.number}</span>
-        <StatusBadge type="pr" status={project.pr.status} />
+    {#if project.prs.length > 0}
+      {@const primaryPR = project.prs[0]}
+      <button class="status-btn" onclick={handleOpenPR} title="Open PR #{primaryPR.number}{project.prs.length > 1 ? ` (+${project.prs.length - 1} more)` : ''}">
+        <span class="pr-number">#{primaryPR.number}{#if project.prs.length > 1}<span class="pr-count">+{project.prs.length - 1}</span>{/if}</span>
+        <StatusBadge type="pr" status={primaryPR.status} />
       </button>
 
-      <StatusBadge type="review" status={project.pr.reviewStatus} />
+      <StatusBadge type="review" status={primaryPR.reviewStatus} />
 
       <button
         class="status-btn"
         onclick={handleOpenCI}
         title="Open CI"
       >
-        <StatusBadge type="ci" status={project.pr.ciStatus} />
+        <StatusBadge type="ci" status={primaryPR.ciStatus} />
       </button>
     {:else}
       <button class="btn-link-pr" onclick={handleLinkPR} title="Link existing PR by branch">
@@ -221,6 +222,12 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--vscode-textLink-foreground);
+  }
+
+  .pr-count {
+    font-size: 10px;
+    margin-left: 2px;
+    color: var(--vscode-descriptionForeground);
   }
 
   .btn-create-pr,

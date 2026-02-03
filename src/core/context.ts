@@ -20,14 +20,16 @@ export function getContextFilePath(taskId: string): string {
 }
 
 /**
- * Format PR status for display
+ * Format PR status for display (shows first/primary PR, with count if multiple)
  */
 function formatPRStatus(project: TaskProject): string {
-  if (!project.pr) {
+  if (project.prs.length === 0) {
     return '—';
   }
 
-  const { number, status, reviewStatus } = project.pr;
+  // Show primary PR (first one, typically most recent open PR)
+  const pr = project.prs[0];
+  const { number, status, reviewStatus } = pr;
   let statusText = `PR #${number}`;
 
   if (status === 'merged') {
@@ -53,18 +55,24 @@ function formatPRStatus(project: TaskProject): string {
     }
   }
 
+  // Indicate if there are more PRs
+  if (project.prs.length > 1) {
+    statusText += ` (+${project.prs.length - 1} more)`;
+  }
+
   return statusText;
 }
 
 /**
- * Format CI status for display
+ * Format CI status for display (shows primary PR's CI status)
  */
 function formatCIStatus(project: TaskProject): string {
-  if (!project.pr) {
+  if (project.prs.length === 0) {
     return '—';
   }
 
-  switch (project.pr.ciStatus) {
+  // Show CI status of primary PR
+  switch (project.prs[0].ciStatus) {
     case 'passed':
       return 'passed';
     case 'failed':
@@ -163,11 +171,14 @@ export function createContextContent(task: Task, existingNotes?: string): string
   lines.push('');
 
   // PR Links
-  const projectsWithPR = task.projects.filter((p) => p.pr);
-  if (projectsWithPR.length > 0) {
+  const projectsWithPRs = task.projects.filter((p) => p.prs.length > 0);
+  if (projectsWithPRs.length > 0) {
     lines.push('## PR Links');
-    for (const project of projectsWithPR) {
-      lines.push(`- ${project.name}: ${project.pr!.url}`);
+    for (const project of projectsWithPRs) {
+      for (const pr of project.prs) {
+        const statusLabel = pr.status === 'open' ? '' : ` (${pr.status})`;
+        lines.push(`- ${project.name}: ${pr.url}${statusLabel}`);
+      }
     }
     lines.push('');
   }

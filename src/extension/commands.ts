@@ -696,7 +696,7 @@ async function createPRCommand(context: vscode.ExtensionContext): Promise<void> 
     // Let user select a project
     const items = task.projects.map((p) => ({
       label: p.name,
-      description: p.pr ? `PR #${p.pr.number}` : 'No PR',
+      description: p.prs.length > 0 ? `PR #${p.prs[0].number}` : 'No PR',
       project: p,
     }));
 
@@ -720,13 +720,13 @@ async function createPRForProject(
   task: Task,
   project: typeof task.projects[0]
 ): Promise<void> {
-  if (project.pr) {
+  if (project.prs.length > 0) {
     const open = await vscode.window.showInformationMessage(
-      `This project already has PR #${project.pr.number}.`,
+      `This project already has PR #${project.prs[0].number}. Use "Link PR" to add another.`,
       'Open PR'
     );
     if (open === 'Open PR') {
-      vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+      vscode.env.openExternal(vscode.Uri.parse(project.prs[0].url));
     }
     return;
   }
@@ -806,12 +806,12 @@ async function createPRForProject(
     return;
   }
 
-  // Update task with PR info
+  // Update task with PR info - add to prs array
   const updatedProjects = task.projects.map((p) => {
     if (p.name === project.name) {
       return {
         ...p,
-        pr: prDetailsToInfo(prResult.data!),
+        prs: [...p.prs, prDetailsToInfo(prResult.data!)],
       };
     }
     return p;
@@ -849,21 +849,15 @@ async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
     return;
   }
 
-  // Get projects without PRs
-  const projectsWithoutPR = task.projects.filter((p) => !p.pr);
-  if (projectsWithoutPR.length === 0) {
-    vscode.window.showInformationMessage('All projects already have PRs linked.');
-    return;
-  }
-
-  // If only one project without PR, use it; otherwise let user select
+  // Let user select a project (if only one project, use it automatically)
   let targetProject: typeof task.projects[0];
-  if (projectsWithoutPR.length === 1) {
-    targetProject = projectsWithoutPR[0];
+  if (task.projects.length === 1) {
+    targetProject = task.projects[0];
   } else {
-    const items = projectsWithoutPR.map((p) => ({
+    const items = task.projects.map((p) => ({
       label: p.name,
-      description: `Branch: ${p.branch}`,
+      description: p.prs.length > 0 ? `${p.prs.length} PR(s) linked` : 'No PRs',
+      detail: `Branch: ${p.branch}`,
       project: p,
     }));
 
@@ -932,12 +926,19 @@ async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
     selectedPR = selected.pr;
   }
 
-  // Update task with PR info
+  // Check if this PR is already linked
+  const prInfo = prDetailsToInfo(selectedPR);
+  if (targetProject.prs.some((p) => p.number === prInfo.number)) {
+    vscode.window.showInformationMessage(`PR #${prInfo.number} is already linked to this project.`);
+    return;
+  }
+
+  // Update task with PR info - add to prs array
   const updatedProjects = task.projects.map((p) => {
     if (p.name === targetProject.name) {
       return {
         ...p,
-        pr: prDetailsToInfo(selectedPR),
+        prs: [...p.prs, prInfo],
       };
     }
     return p;
@@ -966,12 +967,29 @@ async function openPRCommand(): Promise<void> {
   const project = getCurrentProject(task);
   const targetProject = project || task.projects[0];
 
-  if (!targetProject?.pr) {
+  if (!targetProject || targetProject.prs.length === 0) {
     vscode.window.showInformationMessage('No PR for this project. Use "Grove: Create PR" first.');
     return;
   }
 
-  vscode.env.openExternal(vscode.Uri.parse(targetProject.pr.url));
+  // If multiple PRs, let user choose which to open
+  if (targetProject.prs.length === 1) {
+    vscode.env.openExternal(vscode.Uri.parse(targetProject.prs[0].url));
+  } else {
+    const items = targetProject.prs.map((pr) => ({
+      label: `#${pr.number}: ${pr.title || 'No title'}`,
+      description: pr.status,
+      pr,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Select a PR to open',
+    });
+
+    if (selected) {
+      vscode.env.openExternal(vscode.Uri.parse(selected.pr.url));
+    }
+  }
 }
 
 async function openJiraCommand(): Promise<void> {
@@ -1053,7 +1071,7 @@ async function refreshStatusCommand(context: vscode.ExtensionContext): Promise<v
   const refreshingMessage = vscode.window.setStatusBarMessage('Refreshing status...');
 
   for (const project of task.projects) {
-    if (!project.pr) {
+    if (project.prs.length === 0) {
       continue;
     }
 
@@ -1069,9 +1087,12 @@ async function refreshStatusCommand(context: vscode.ExtensionContext): Promise<v
       continue;
     }
 
-    const prResult = await client.getPR(owner, repo, project.pr.number);
-    if (prResult.success && prResult.data) {
-      project.pr = prDetailsToInfo(prResult.data);
+    // Update all PRs for this project
+    for (let i = 0; i < project.prs.length; i++) {
+      const prResult = await client.getPR(owner, repo, project.prs[i].number);
+      if (prResult.success && prResult.data) {
+        project.prs[i] = prDetailsToInfo(prResult.data);
+      }
     }
   }
 

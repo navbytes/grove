@@ -22,13 +22,15 @@ describe('context', () => {
         worktreePath: '/workspaces/TASK-200/backend-api',
         branch: 'TASK-200-add-user-preferences',
         baseBranch: 'main',
-        pr: {
-          number: 145,
-          url: 'https://github.com/org/backend-api/pull/145',
-          status: 'open',
-          reviewStatus: 'approved',
-          ciStatus: 'passed',
-        },
+        prs: [
+          {
+            number: 145,
+            url: 'https://github.com/org/backend-api/pull/145',
+            status: 'open',
+            reviewStatus: 'approved',
+            ciStatus: 'passed',
+          },
+        ],
       },
       {
         name: 'web-ui',
@@ -36,7 +38,7 @@ describe('context', () => {
         worktreePath: '/workspaces/TASK-200/web-ui',
         branch: 'TASK-200-add-user-preferences',
         baseBranch: 'main',
-        pr: null,
+        prs: [],
       },
     ],
     workspaceFile: '/workspaces/TASK-200/TASK-200.code-workspace',
@@ -48,6 +50,7 @@ describe('context', () => {
         addedAt: '2024-01-01T00:00:00Z',
       },
     ],
+    links: [],
   };
 
   describe('createContextContent', () => {
