@@ -36,9 +36,11 @@ interface TaskProject {
   worktreePath: string;   // Worktree location
   branch: string;         // Feature branch name
   baseBranch: string;     // Base branch (main/develop)
-  pr: PRInfo | null;      // PR tracking info
+  prs: PRInfo[];          // Multiple PRs (primary PR is first in array)
 }
 ```
+
+**Note**: Projects support multiple PRs (e.g., PR to main and PR to develop). The first PR in the array is considered the "primary" PR for display purposes.
 
 ### Project (Registered repository)
 
