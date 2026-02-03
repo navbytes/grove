@@ -16,6 +16,7 @@
     "url": "https://github.com/navbytes/grove/issues"
   },
   "homepage": "https://github.com/navbytes/grove#readme",
+  "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
