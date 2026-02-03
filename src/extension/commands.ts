@@ -124,6 +124,12 @@ export function registerCommands(
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('grove.linkPR', () =>
+      linkPRCommand(context).then(() => sidebarProvider.refresh())
+    )
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('grove.openPR', openPRCommand)
   );
 
@@ -816,6 +822,112 @@ async function createPRForProject(
 
   const open = await vscode.window.showInformationMessage(
     `PR #${prResult.data.number} created!`,
+    'Open PR'
+  );
+
+  if (open === 'Open PR') {
+    vscode.env.openExternal(vscode.Uri.parse(prResult.data.url));
+  }
+}
+
+async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
+  const task = getCurrentTask();
+  if (!task) {
+    vscode.window.showWarningMessage('This command is only available in a Grove task workspace.');
+    return;
+  }
+
+  const config = readConfig();
+  if (!config.success || !config.data?.git) {
+    vscode.window.showWarningMessage('Git provider not configured. Run "Grove: Setup" first.');
+    return;
+  }
+
+  const token = await context.secrets.get(SECRET_KEYS.GIT_API_TOKEN);
+  if (!token) {
+    vscode.window.showWarningMessage('Git API token not found. Run "Grove: Setup" first.');
+    return;
+  }
+
+  // Get projects without PRs
+  const projectsWithoutPR = task.projects.filter((p) => !p.pr);
+  if (projectsWithoutPR.length === 0) {
+    vscode.window.showInformationMessage('All projects already have PRs linked.');
+    return;
+  }
+
+  // If only one project without PR, use it; otherwise let user select
+  let targetProject: typeof task.projects[0];
+  if (projectsWithoutPR.length === 1) {
+    targetProject = projectsWithoutPR[0];
+  } else {
+    const items = projectsWithoutPR.map((p) => ({
+      label: p.name,
+      description: `Branch: ${p.branch}`,
+      project: p,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Select a project to link PR for',
+    });
+
+    if (!selected) {
+      return;
+    }
+    targetProject = selected.project;
+  }
+
+  // Get remote URL to determine owner/repo
+  const remoteResult = await getRemoteUrl(targetProject.repoPath);
+  if (!remoteResult.success || !remoteResult.data) {
+    vscode.window.showErrorMessage('Could not determine remote URL.');
+    return;
+  }
+
+  const owner = extractRepoOwner(remoteResult.data);
+  const repo = extractRepoName(remoteResult.data);
+
+  if (!owner || !repo) {
+    vscode.window.showErrorMessage('Could not parse owner/repo from remote URL.');
+    return;
+  }
+
+  // Find PR by branch
+  const client = createGitHubClient();
+  client.setToken(token);
+
+  const searchingMessage = vscode.window.setStatusBarMessage('Searching for PR...');
+  const prResult = await client.findPRByBranch(owner, repo, targetProject.branch);
+  searchingMessage.dispose();
+
+  if (!prResult.success) {
+    vscode.window.showErrorMessage(`Failed to search for PR: ${prResult.error}`);
+    return;
+  }
+
+  if (!prResult.data) {
+    vscode.window.showWarningMessage(
+      `No PR found for branch "${targetProject.branch}". Create one first.`
+    );
+    return;
+  }
+
+  // Update task with PR info
+  const updatedProjects = task.projects.map((p) => {
+    if (p.name === targetProject.name) {
+      return {
+        ...p,
+        pr: prDetailsToInfo(prResult.data!),
+      };
+    }
+    return p;
+  });
+
+  await updateTask(task.id, { projects: updatedProjects });
+  generateContextFile({ ...task, projects: updatedProjects });
+
+  const open = await vscode.window.showInformationMessage(
+    `Linked PR #${prResult.data.number}: ${prResult.data.title}`,
     'Open PR'
   );
 

@@ -40,6 +40,7 @@ All commands are registered in `src/extension/commands.ts` via `registerCommands
 | Command ID | Title | Description |
 |------------|-------|-------------|
 | `grove.createPR` | Grove: Create PR | Create GitHub PR |
+| `grove.linkPR` | Grove: Link PR | Auto-detect and link existing PR by branch |
 | `grove.openPR` | Grove: Open PR | Open PR in browser |
 | `grove.openCI` | Grove: Open CI | Open CI status page |
 | `grove.refreshStatus` | Grove: Refresh Status | Manual status refresh |
