@@ -149,6 +149,21 @@
         "category": "Grove"
       },
       {
+        "command": "grove.addLink",
+        "title": "Grove: Add Link",
+        "category": "Grove"
+      },
+      {
+        "command": "grove.removeLink",
+        "title": "Grove: Remove Link",
+        "category": "Grove"
+      },
+      {
+        "command": "grove.openLink",
+        "title": "Grove: Open Link",
+        "category": "Grove"
+      },
+      {
         "command": "grove.refreshSidebar",
         "title": "Grove: Refresh Sidebar",
         "icon": "$(refresh)"
@@ -160,6 +175,12 @@
       {
         "command": "grove.showStatusMenu",
         "title": "Grove: Show Status Menu"
+      },
+      {
+        "command": "grove.openDashboard",
+        "title": "Grove: Open Dashboard",
+        "category": "Grove",
+        "icon": "$(dashboard)"
       }
     ],
     "views": {
@@ -180,6 +201,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "grove.openDashboard",
+          "when": "view == groveExplorer",
+          "group": "navigation"
+        },
         {
           "command": "grove.refreshSidebar",
           "when": "view == groveExplorer",
@@ -303,9 +329,11 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "bun run compile",
+    "vscode:prepublish": "bun run compile && bun run build:webview",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "build:webview": "cd webview-ui && bun install && bun run build",
+    "watch:webview": "cd webview-ui && bun run dev",
     "pretest": "bun run compile && bun run lint",
     "lint": "eslint src --ext ts",
     "test": "bun ./out/test/runTest.js",

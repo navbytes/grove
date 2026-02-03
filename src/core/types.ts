@@ -93,6 +93,21 @@ export interface SlackThread {
 }
 
 /**
+ * Link type for categorizing external links
+ */
+export type LinkType = 'confluence' | 'notion' | 'google-docs' | 'figma' | 'other';
+
+/**
+ * Generic link associated with a task (Confluence, Notion, Google Docs, etc.)
+ */
+export interface TaskLink {
+  url: string;
+  title?: string; // Optional user-provided title/description
+  type: LinkType; // Type of link for icon/display purposes
+  addedAt: string;
+}
+
+/**
  * A task representing a unit of work
  */
 export interface Task {
@@ -107,6 +122,7 @@ export interface Task {
   workspaceFile: string;
   notes: string;
   slackThreads: SlackThread[]; // Slack threads associated with this task
+  links: TaskLink[]; // Generic links (Confluence, Notion, etc.) associated with this task
 }
 
 /**

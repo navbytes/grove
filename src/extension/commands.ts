@@ -29,6 +29,9 @@ import {
   removeSlackThread,
   getAvailableProjectsForTask,
   refreshTask,
+  addLink,
+  removeLink,
+  detectLinkType,
 } from '../core/tasks';
 import { generateContextFile, getContextFilePath } from '../core/context';
 import { pushBranch, isBranchPushed } from '../core/worktree';
@@ -161,6 +164,23 @@ export function registerCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand('grove.openSlackThread', openSlackThreadCommand)
+  );
+
+  // Link commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.addLink', () =>
+      addLinkCommand().then(() => sidebarProvider.refresh())
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.removeLink', () =>
+      removeLinkCommand().then(() => sidebarProvider.refresh())
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.openLink', openLinkCommand)
   );
 
   // Sidebar commands
@@ -1059,5 +1079,144 @@ async function openSlackThreadCommand(): Promise<void> {
 
   if (selected) {
     vscode.env.openExternal(vscode.Uri.parse(selected.thread.url));
+  }
+}
+
+async function addLinkCommand(): Promise<void> {
+  const task = getCurrentTask();
+  if (!task) {
+    vscode.window.showWarningMessage('This command is only available in a Grove task workspace.');
+    return;
+  }
+
+  const url = await vscode.window.showInputBox({
+    prompt: 'Enter link URL (Confluence, Notion, Google Docs, Figma, or any URL)',
+    placeHolder: 'https://company.atlassian.net/wiki/spaces/...',
+    validateInput: (value) => {
+      if (!value.trim()) {
+        return 'URL is required';
+      }
+      try {
+        new URL(value);
+        return undefined;
+      } catch {
+        return 'Please enter a valid URL';
+      }
+    },
+  });
+
+  if (!url) {
+    return;
+  }
+
+  const detectedType = detectLinkType(url);
+  const typeLabels: Record<string, string> = {
+    confluence: 'Confluence',
+    notion: 'Notion',
+    'google-docs': 'Google Docs',
+    figma: 'Figma',
+    other: 'Other',
+  };
+
+  const title = await vscode.window.showInputBox({
+    prompt: `Enter a title for this ${typeLabels[detectedType]} link (optional)`,
+    placeHolder: 'Design document for API',
+  });
+
+  const result = addLink(task.id, url, title || undefined, detectedType);
+  if (!result.success) {
+    vscode.window.showErrorMessage(`Failed to add link: ${result.error}`);
+    return;
+  }
+
+  vscode.window.showInformationMessage(`${typeLabels[detectedType]} link added.`);
+}
+
+async function removeLinkCommand(): Promise<void> {
+  const task = getCurrentTask();
+  if (!task) {
+    vscode.window.showWarningMessage('This command is only available in a Grove task workspace.');
+    return;
+  }
+
+  // Initialize links array if it doesn't exist (for backward compatibility)
+  const links = task.links || [];
+
+  if (links.length === 0) {
+    vscode.window.showInformationMessage('No links in this task.');
+    return;
+  }
+
+  const typeLabels: Record<string, string> = {
+    confluence: 'Confluence',
+    notion: 'Notion',
+    'google-docs': 'Google Docs',
+    figma: 'Figma',
+    other: 'Link',
+  };
+
+  const items = links.map((l) => ({
+    label: l.title || l.url,
+    description: l.title ? `${l.url} (${typeLabels[l.type]})` : typeLabels[l.type],
+    link: l,
+  }));
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Select a link to remove',
+  });
+
+  if (!selected) {
+    return;
+  }
+
+  const result = removeLink(task.id, selected.link.url);
+  if (!result.success) {
+    vscode.window.showErrorMessage(`Failed to remove link: ${result.error}`);
+    return;
+  }
+
+  vscode.window.showInformationMessage('Link removed.');
+}
+
+async function openLinkCommand(): Promise<void> {
+  const task = getCurrentTask();
+  if (!task) {
+    vscode.window.showWarningMessage('This command is only available in a Grove task workspace.');
+    return;
+  }
+
+  // Initialize links array if it doesn't exist (for backward compatibility)
+  const links = task.links || [];
+
+  if (links.length === 0) {
+    vscode.window.showInformationMessage('No links in this task.');
+    return;
+  }
+
+  if (links.length === 1) {
+    vscode.env.openExternal(vscode.Uri.parse(links[0].url));
+    return;
+  }
+
+  const typeLabels: Record<string, string> = {
+    confluence: 'Confluence',
+    notion: 'Notion',
+    'google-docs': 'Google Docs',
+    figma: 'Figma',
+    other: 'Link',
+  };
+
+  const items = links.map((l) => ({
+    label: l.title || l.url,
+    description: l.title ? `${l.url} (${typeLabels[l.type]})` : typeLabels[l.type],
+    link: l,
+  }));
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Select a link to open',
+  });
+
+  if (selected) {
+    vscode.env.openExternal(vscode.Uri.parse(selected.link.url));
   }
 }

@@ -11,6 +11,8 @@ import {
   Project,
   OperationResult,
   SlackThread,
+  TaskLink,
+  LinkType,
 } from './types';
 import {
   readConfig,
@@ -138,6 +140,7 @@ export async function createTask(options: CreateTaskOptions): Promise<OperationR
     workspaceFile: getWorkspaceFilePath(taskId),
     notes: '',
     slackThreads: [],
+    links: [],
   };
 
   // Generate workspace file
@@ -543,4 +546,150 @@ export function refreshTask(taskId: string): OperationResult<Task> {
   generateContextFile(task);
 
   return { success: true, data: task };
+}
+
+/**
+ * Detect link type from URL
+ */
+export function detectLinkType(url: string): LinkType {
+  const lowerUrl = url.toLowerCase();
+
+  if (lowerUrl.includes('confluence') || lowerUrl.includes('atlassian.net/wiki')) {
+    return 'confluence';
+  }
+  if (lowerUrl.includes('notion.so') || lowerUrl.includes('notion.site')) {
+    return 'notion';
+  }
+  if (lowerUrl.includes('docs.google.com') || lowerUrl.includes('drive.google.com')) {
+    return 'google-docs';
+  }
+  if (lowerUrl.includes('figma.com')) {
+    return 'figma';
+  }
+
+  return 'other';
+}
+
+/**
+ * Add a link to a task
+ */
+export function addLink(
+  taskId: string,
+  url: string,
+  title?: string,
+  type?: LinkType
+): OperationResult<Task> {
+  const taskResult = getTask(taskId);
+  if (!taskResult.success || !taskResult.data) {
+    return { success: false, error: `Task "${taskId}" not found` };
+  }
+  const task = taskResult.data;
+
+  // Initialize links array if it doesn't exist (for backward compatibility)
+  if (!task.links) {
+    task.links = [];
+  }
+
+  // Check if link already exists
+  if (task.links.some((l) => l.url === url)) {
+    return {
+      success: false,
+      error: 'Link already added to this task',
+    };
+  }
+
+  const link: TaskLink = {
+    url,
+    title,
+    type: type || detectLinkType(url),
+    addedAt: new Date().toISOString(),
+  };
+
+  task.links.push(link);
+
+  const updateResult = updateTask(taskId, { links: task.links });
+  if (!updateResult.success || !updateResult.data) {
+    return { success: false, error: updateResult.error };
+  }
+
+  // Regenerate context file to include links
+  generateContextFile(updateResult.data);
+
+  return { success: true, data: updateResult.data };
+}
+
+/**
+ * Remove a link from a task
+ */
+export function removeLink(taskId: string, url: string): OperationResult<Task> {
+  const taskResult = getTask(taskId);
+  if (!taskResult.success || !taskResult.data) {
+    return { success: false, error: `Task "${taskId}" not found` };
+  }
+  const task = taskResult.data;
+
+  // Initialize links array if it doesn't exist (for backward compatibility)
+  if (!task.links) {
+    task.links = [];
+  }
+
+  const index = task.links.findIndex((l) => l.url === url);
+  if (index === -1) {
+    return {
+      success: false,
+      error: 'Link not found in this task',
+    };
+  }
+
+  task.links.splice(index, 1);
+
+  const updateResult = updateTask(taskId, { links: task.links });
+  if (!updateResult.success || !updateResult.data) {
+    return { success: false, error: updateResult.error };
+  }
+
+  // Regenerate context file
+  generateContextFile(updateResult.data);
+
+  return { success: true, data: updateResult.data };
+}
+
+/**
+ * Update a link's title
+ */
+export function updateLinkTitle(
+  taskId: string,
+  url: string,
+  newTitle: string
+): OperationResult<Task> {
+  const taskResult = getTask(taskId);
+  if (!taskResult.success || !taskResult.data) {
+    return { success: false, error: `Task "${taskId}" not found` };
+  }
+  const task = taskResult.data;
+
+  // Initialize links array if it doesn't exist (for backward compatibility)
+  if (!task.links) {
+    task.links = [];
+  }
+
+  const link = task.links.find((l) => l.url === url);
+  if (!link) {
+    return {
+      success: false,
+      error: 'Link not found in this task',
+    };
+  }
+
+  link.title = newTitle;
+
+  const updateResult = updateTask(taskId, { links: task.links });
+  if (!updateResult.success || !updateResult.data) {
+    return { success: false, error: updateResult.error };
+  }
+
+  // Regenerate context file
+  generateContextFile(updateResult.data);
+
+  return { success: true, data: updateResult.data };
 }

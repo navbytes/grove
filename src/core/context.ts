@@ -79,6 +79,24 @@ function formatCIStatus(project: TaskProject): string {
 }
 
 /**
+ * Get human-readable label for link type
+ */
+function getLinkTypeLabel(type: string): string {
+  switch (type) {
+    case 'confluence':
+      return 'Confluence';
+    case 'notion':
+      return 'Notion';
+    case 'google-docs':
+      return 'Google Docs';
+    case 'figma':
+      return 'Figma';
+    default:
+      return 'Link';
+  }
+}
+
+/**
  * Generate the context file content
  */
 export function createContextContent(task: Task, existingNotes?: string): string {
@@ -111,6 +129,20 @@ export function createContextContent(task: Task, existingNotes?: string): string
         lines.push(`- [${thread.title}](${thread.url})`);
       } else {
         lines.push(`- ${thread.url}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // Links (Confluence, Notion, etc.)
+  if (task.links && task.links.length > 0) {
+    lines.push('## Related Links');
+    for (const link of task.links) {
+      const typeLabel = getLinkTypeLabel(link.type);
+      if (link.title) {
+        lines.push(`- [${link.title}](${link.url}) (${typeLabel})`);
+      } else {
+        lines.push(`- ${link.url} (${typeLabel})`);
       }
     }
     lines.push('');

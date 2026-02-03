@@ -14,5 +14,5 @@
     "declaration": true,
     "declarationMap": true
   },
-  "exclude": ["node_modules", ".vscode-test", "out", "src/test"]
+  "exclude": ["node_modules", ".vscode-test", "out", "src/test", "webview-ui"]
 }

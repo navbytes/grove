@@ -13,3 +13,12 @@ docs/**
 *.vsix
 node_modules/**
 assets/*.svg
+webview-ui/node_modules/**
+webview-ui/src/**
+webview-ui/bun.lock
+webview-ui/tsconfig.json
+webview-ui/vite.config.ts
+webview-ui/svelte.config.js
+webview-ui/package.json
+webview-ui/index.html
+webview-ui/public/**
