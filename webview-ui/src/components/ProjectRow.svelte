@@ -28,6 +28,14 @@
     });
   };
 
+  const handleLinkPR = () => {
+    vscode.postMessage({
+      type: 'linkPR',
+      taskId,
+      projectName: project.name,
+    });
+  };
+
   const handleOpenCI = () => {
     if (project.pr) {
       vscode.postMessage({
@@ -88,7 +96,21 @@
         <StatusBadge type="ci" status={project.pr.ciStatus} />
       </button>
     {:else}
-      <button class="btn-create-pr" onclick={handleCreatePR}>
+      <button class="btn-link-pr" onclick={handleLinkPR} title="Link existing PR by branch">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+        </svg>
+        Link PR
+      </button>
+      <button class="btn-create-pr" onclick={handleCreatePR} title="Create new PR">
         <svg
           width="14"
           height="14"
@@ -201,7 +223,8 @@
     color: var(--vscode-textLink-foreground);
   }
 
-  .btn-create-pr {
+  .btn-create-pr,
+  .btn-link-pr {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -216,11 +239,13 @@
     transition: background-color 0.15s ease;
   }
 
-  .btn-create-pr:hover {
+  .btn-create-pr:hover,
+  .btn-link-pr:hover {
     background-color: var(--vscode-button-secondaryHoverBackground);
   }
 
-  .btn-create-pr svg {
+  .btn-create-pr svg,
+  .btn-link-pr svg {
     flex-shrink: 0;
   }
 </style>

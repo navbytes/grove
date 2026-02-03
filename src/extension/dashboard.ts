@@ -19,6 +19,7 @@ type MessageToExtension =
   | { type: 'openSlack'; url: string }
   | { type: 'openLink'; url: string }
   | { type: 'createPR'; taskId: string; projectName: string }
+  | { type: 'linkPR'; taskId: string; projectName: string }
   | { type: 'refresh' }
   | { type: 'ready' };
 
@@ -202,6 +203,11 @@ export class GroveDashboardPanel {
           message.taskId,
           message.projectName
         );
+        this._sendData();
+        break;
+
+      case 'linkPR':
+        await vscode.commands.executeCommand('grove.linkPR');
         this._sendData();
         break;
     }

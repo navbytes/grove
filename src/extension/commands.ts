@@ -892,24 +892,44 @@ async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
     return;
   }
 
-  // Find PR by branch
+  // Find all PRs for branch
   const client = createGitHubClient();
   client.setToken(token);
 
-  const searchingMessage = vscode.window.setStatusBarMessage('Searching for PR...');
-  const prResult = await client.findPRByBranch(owner, repo, targetProject.branch);
+  const searchingMessage = vscode.window.setStatusBarMessage('Searching for PRs...');
+  const prsResult = await client.findAllPRsByBranch(owner, repo, targetProject.branch);
   searchingMessage.dispose();
 
-  if (!prResult.success) {
-    vscode.window.showErrorMessage(`Failed to search for PR: ${prResult.error}`);
+  if (!prsResult.success) {
+    vscode.window.showErrorMessage(`Failed to search for PRs: ${prsResult.error}`);
     return;
   }
 
-  if (!prResult.data) {
+  if (!prsResult.data || prsResult.data.length === 0) {
     vscode.window.showWarningMessage(
       `No PR found for branch "${targetProject.branch}". Create one first.`
     );
     return;
+  }
+
+  // If multiple PRs, let user choose (open PRs are already sorted first)
+  let selectedPR = prsResult.data[0];
+  if (prsResult.data.length > 1) {
+    const prItems = prsResult.data.map((pr) => ({
+      label: `#${pr.number}: ${pr.title || 'No title'}`,
+      description: pr.status === 'open' ? 'Open' : pr.status === 'merged' ? 'Merged' : 'Closed',
+      detail: `Updated ${new Date(pr.updatedAt || '').toLocaleDateString()}`,
+      pr,
+    }));
+
+    const selected = await vscode.window.showQuickPick(prItems, {
+      placeHolder: `Found ${prsResult.data.length} PRs for this branch. Select one to link:`,
+    });
+
+    if (!selected) {
+      return;
+    }
+    selectedPR = selected.pr;
   }
 
   // Update task with PR info
@@ -917,7 +937,7 @@ async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
     if (p.name === targetProject.name) {
       return {
         ...p,
-        pr: prDetailsToInfo(prResult.data!),
+        pr: prDetailsToInfo(selectedPR),
       };
     }
     return p;
@@ -927,12 +947,12 @@ async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
   generateContextFile({ ...task, projects: updatedProjects });
 
   const open = await vscode.window.showInformationMessage(
-    `Linked PR #${prResult.data.number}: ${prResult.data.title}`,
+    `Linked PR #${selectedPR.number}: ${selectedPR.title}`,
     'Open PR'
   );
 
   if (open === 'Open PR') {
-    vscode.env.openExternal(vscode.Uri.parse(prResult.data.url));
+    vscode.env.openExternal(vscode.Uri.parse(selectedPR.url));
   }
 }
 

@@ -76,6 +76,7 @@ export type MessageToExtension =
   | { type: 'openSlack'; url: string }
   | { type: 'openLink'; url: string }
   | { type: 'createPR'; taskId: string; projectName: string }
+  | { type: 'linkPR'; taskId: string; projectName: string }
   | { type: 'refresh' }
   | { type: 'ready' };
 
