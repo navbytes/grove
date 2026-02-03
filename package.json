@@ -8,6 +8,14 @@
   "author": {
     "name": "Naveen"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/navbytes/grove.git"
+  },
+  "bugs": {
+    "url": "https://github.com/navbytes/grove/issues"
+  },
+  "homepage": "https://github.com/navbytes/grove#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
