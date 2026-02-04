@@ -74,18 +74,18 @@ export class GroveDashboardPanel {
     this._panel = panel;
     this._extensionUri = extensionUri;
 
-    // Set the webview's initial html content
-    this._update();
-
     // Listen for when the panel is disposed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Handle messages from the webview
+    // Handle messages from the webview - MUST be registered before setting HTML
     this._panel.webview.onDidReceiveMessage(
       (message: MessageToExtension) => this._handleMessage(message),
       null,
       this._disposables
     );
+
+    // Set the webview's initial html content (after handler is registered)
+    this._update();
   }
 
   public dispose() {
