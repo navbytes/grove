@@ -11,14 +11,12 @@ import {
   DEFAULT_CONFIG,
   SECRET_KEYS,
   GitProvider,
-  WorktreeSetup,
   CopyRule,
   CopyMode,
   Project,
 } from '../core/types';
-import { writeConfig, expandPath, ensureWorkspaceDir } from '../core/config';
+import { writeConfig, ensureWorkspaceDir } from '../core/config';
 import { registerProject, detectDefaultBranch, updateProject, getProject } from '../core/projects';
-import { getCombinedSetup } from '../core/worktree-setup';
 import { createJiraClient } from '../core/jira';
 import { createGitHubClient } from '../core/github';
 
@@ -48,7 +46,6 @@ export async function showSetupWizard(context: vscode.ExtensionContext): Promise
   config.workspaceDir = workspaceDir;
 
   // Ensure workspace directory exists
-  const expandedDir = expandPath(workspaceDir);
   const dirResult = ensureWorkspaceDir();
   if (!dirResult.success) {
     vscode.window.showErrorMessage(`Failed to create workspace directory: ${dirResult.error}`);
@@ -507,11 +504,9 @@ export async function configureWorktreeSetupWizard(projectName?: string): Promis
 
   const project = projectResult.data;
 
-  // Get current combined setup (repo + project)
-  const currentSetup = getCombinedSetup(project);
-
   // Main menu loop
-  while (true) {
+  let done = false;
+  while (!done) {
     const menuItems: vscode.QuickPickItem[] = [
       { label: '$(add) Add file/folder rule', description: 'Copy or symlink files to new worktrees' },
       { label: '$(terminal) Add post-create command', description: 'Run command after worktree creation' },
@@ -551,7 +546,8 @@ export async function configureWorktreeSetupWizard(projectName?: string): Promis
     });
 
     if (!choice || choice.label === '$(check) Done') {
-      break;
+      done = true;
+      continue;
     }
 
     if (choice.label === '$(add) Add file/folder rule') {
