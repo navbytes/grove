@@ -64,6 +64,11 @@
         "category": "Grove"
       },
       {
+        "command": "grove.configureWorktreeSetup",
+        "title": "Grove: Configure Worktree Setup",
+        "category": "Grove"
+      },
+      {
         "command": "grove.newTask",
         "title": "Grove: New Task",
         "category": "Grove"
@@ -101,6 +106,11 @@
       {
         "command": "grove.createPR",
         "title": "Grove: Create PR",
+        "category": "Grove"
+      },
+      {
+        "command": "grove.linkPR",
+        "title": "Grove: Link PR",
         "category": "Grove"
       },
       {
@@ -274,6 +284,11 @@
           "group": "2_actions"
         },
         {
+          "command": "grove.linkPR",
+          "when": "view == groveExplorer && viewItem == taskProject",
+          "group": "2_actions"
+        },
+        {
           "command": "grove.openCI",
           "when": "view == groveExplorer && viewItem == taskProject",
           "group": "navigation"
@@ -282,6 +297,11 @@
           "command": "grove.removeProjectFromTask",
           "when": "view == groveExplorer && viewItem == taskProject",
           "group": "3_danger"
+        },
+        {
+          "command": "grove.configureWorktreeSetup",
+          "when": "view == groveExplorer && viewItem == registeredProject",
+          "group": "2_setup"
         },
         {
           "command": "grove.removeProject",

@@ -37,7 +37,7 @@ export interface TaskProject {
   worktreePath: string;
   branch: string;
   baseBranch: string;
-  pr: PRInfo | null;
+  prs: PRInfo[];
 }
 
 export interface Task {
@@ -76,6 +76,7 @@ export type MessageToExtension =
   | { type: 'openSlack'; url: string }
   | { type: 'openLink'; url: string }
   | { type: 'createPR'; taskId: string; projectName: string }
+  | { type: 'linkPR'; taskId: string; projectName: string }
   | { type: 'refresh' }
   | { type: 'ready' };
 

@@ -98,9 +98,11 @@ class GroveTreeItem extends vscode.TreeItem {
 
     // Build description with PR and CI status
     const parts: string[] = [];
-    if (project.pr) {
-      parts.push(`PR #${project.pr.number} ${this.getPRIcon(project.pr.status, project.pr.reviewStatus)}`);
-      parts.push(`CI ${this.getCIIcon(project.pr.ciStatus)}`);
+    if (project.prs.length > 0) {
+      const pr = project.prs[0];
+      const prCount = project.prs.length > 1 ? ` (+${project.prs.length - 1})` : '';
+      parts.push(`PR #${pr.number}${prCount} ${this.getPRIcon(pr.status, pr.reviewStatus)}`);
+      parts.push(`CI ${this.getCIIcon(pr.ciStatus)}`);
     } else {
       parts.push('No PR');
     }
@@ -111,16 +113,17 @@ class GroveTreeItem extends vscode.TreeItem {
       `Branch: ${project.branch}`,
       `Base: ${project.baseBranch}`,
     ];
-    if (project.pr) {
-      tooltipParts.push(`PR: #${project.pr.number} (${project.pr.status})`);
-      tooltipParts.push(`Review: ${project.pr.reviewStatus}`);
-      tooltipParts.push(`CI: ${project.pr.ciStatus}`);
+    if (project.prs.length > 0) {
+      for (const pr of project.prs) {
+        tooltipParts.push(`PR #${pr.number}: ${pr.status} (review: ${pr.reviewStatus}, CI: ${pr.ciStatus})`);
+      }
     }
     this.tooltip = tooltipParts.join('\n');
 
-    // Icon based on PR status
-    if (project.pr) {
-      this.iconPath = this.getPRThemeIcon(project.pr.status, project.pr.reviewStatus);
+    // Icon based on primary PR status
+    if (project.prs.length > 0) {
+      const pr = project.prs[0];
+      this.iconPath = this.getPRThemeIcon(pr.status, pr.reviewStatus);
     } else {
       this.iconPath = new vscode.ThemeIcon('git-branch');
     }

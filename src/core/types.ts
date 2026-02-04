@@ -48,6 +48,28 @@ export interface CIConfig {
 }
 
 /**
+ * Copy mode for worktree setup rules
+ */
+export type CopyMode = 'copy' | 'symlink';
+
+/**
+ * Rule for copying/symlinking files to new worktrees
+ */
+export interface CopyRule {
+  source: string; // Relative to main repo, or absolute path (supports ~/)
+  destination?: string; // Target path in worktree (defaults to source)
+  mode: CopyMode; // 'copy' for files that may differ, 'symlink' for shared resources
+}
+
+/**
+ * Configuration for setting up new worktrees
+ */
+export interface WorktreeSetup {
+  copyFiles?: CopyRule[]; // Files/folders to copy or symlink
+  postCreateCommands?: string[]; // Commands to run after worktree creation (e.g., "npm install")
+}
+
+/**
  * A registered git repository
  */
 export interface Project {
@@ -56,6 +78,8 @@ export interface Project {
   defaultBaseBranch: string;
   // Optional: remote URL for the repo
   remoteUrl?: string;
+  // Optional: setup rules for new worktrees
+  worktreeSetup?: WorktreeSetup;
 }
 
 /**
@@ -80,7 +104,7 @@ export interface TaskProject {
   worktreePath: string;
   branch: string;
   baseBranch: string;
-  pr: PRInfo | null;
+  prs: PRInfo[];
 }
 
 /**
@@ -208,6 +232,7 @@ export const GROVE_PATHS = {
   PROJECTS_FILE: 'projects.json',
   TASKS_FILE: 'tasks.json',
   CONTEXT_FILE: '.grove-context.md',
+  REPO_SETUP_FILE: '.grove/setup.json', // Repo-level worktree setup config
 } as const;
 
 /**

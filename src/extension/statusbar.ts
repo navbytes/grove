@@ -99,10 +99,11 @@ export class GroveStatusBar {
 
     // Add project summaries (max 2)
     const projectSummaries = task.projects.slice(0, 2).map((p) => {
-      if (p.pr) {
+      if (p.prs.length > 0) {
         const prIcon = this.getPRStatusIcon(p);
         const ciIcon = this.getCIStatusIcon(p);
-        return `${p.name}: PR #${p.pr.number} ${prIcon}${ciIcon}`;
+        const prCount = p.prs.length > 1 ? ` (+${p.prs.length - 1})` : '';
+        return `${p.name}: PR #${p.prs[0].number}${prCount} ${prIcon}${ciIcon}`;
       }
       return `${p.name}: No PR`;
     });
@@ -131,10 +132,14 @@ export class GroveStatusBar {
 
     md.appendMarkdown('**Projects:**\n');
     for (const project of task.projects) {
-      const prStatus = project.pr
-        ? `PR #${project.pr.number} (${project.pr.reviewStatus}, CI: ${project.pr.ciStatus})`
-        : 'No PR';
-      md.appendMarkdown(`- ${project.name}: ${prStatus}\n`);
+      if (project.prs.length > 0) {
+        const prList = project.prs.map((pr) =>
+          `PR #${pr.number} (${pr.reviewStatus}, CI: ${pr.ciStatus})`
+        ).join(', ');
+        md.appendMarkdown(`- ${project.name}: ${prList}\n`);
+      } else {
+        md.appendMarkdown(`- ${project.name}: No PR\n`);
+      }
     }
 
     if (task.slackThreads.length > 0) {
@@ -146,14 +151,14 @@ export class GroveStatusBar {
   }
 
   /**
-   * Get PR status icon
+   * Get PR status icon (based on primary PR)
    */
   private getPRStatusIcon(project: TaskProject): string {
-    if (!project.pr) {
+    if (project.prs.length === 0) {
       return '';
     }
 
-    switch (project.pr.reviewStatus) {
+    switch (project.prs[0].reviewStatus) {
       case 'approved':
         return '$(check)';
       case 'changes_requested':
@@ -164,14 +169,14 @@ export class GroveStatusBar {
   }
 
   /**
-   * Get CI status icon
+   * Get CI status icon (based on primary PR)
    */
   private getCIStatusIcon(project: TaskProject): string {
-    if (!project.pr) {
+    if (project.prs.length === 0) {
       return '';
     }
 
-    switch (project.pr.ciStatus) {
+    switch (project.prs[0].ciStatus) {
       case 'passed':
         return '$(pass)';
       case 'failed':
@@ -251,8 +256,8 @@ export class GroveStatusBar {
    */
   private openAllPRs(task: Task): void {
     for (const project of task.projects) {
-      if (project.pr) {
-        vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+      for (const pr of project.prs) {
+        vscode.env.openExternal(vscode.Uri.parse(pr.url));
       }
     }
   }

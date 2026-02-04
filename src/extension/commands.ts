@@ -40,7 +40,7 @@ import { createJiraClient, JiraClient } from '../core/jira';
 import { createGitHubClient, GitHubClient } from '../core/github';
 import { prDetailsToInfo } from '../core/git-provider';
 import { extractRepoOwner, extractRepoName, getRemoteUrl } from '../core/projects';
-import { showSetupWizard, registerProjectWizard, editSettings } from './setup';
+import { showSetupWizard, registerProjectWizard, editSettings, configureWorktreeSetupWizard } from './setup';
 import { GroveSidebarProvider } from './sidebar';
 
 /**
@@ -75,6 +75,12 @@ export function registerCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand('grove.editSettings', editSettings)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.configureWorktreeSetup', (item?: { data?: { project?: Project } }) =>
+      configureWorktreeSetupWizard(item?.data?.project?.name).then(() => sidebarProvider.refresh())
+    )
   );
 
   // Task Management Commands
@@ -120,6 +126,12 @@ export function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('grove.createPR', () =>
       createPRCommand(context).then(() => sidebarProvider.refresh())
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.linkPR', () =>
+      linkPRCommand(context).then(() => sidebarProvider.refresh())
     )
   );
 
@@ -690,7 +702,7 @@ async function createPRCommand(context: vscode.ExtensionContext): Promise<void> 
     // Let user select a project
     const items = task.projects.map((p) => ({
       label: p.name,
-      description: p.pr ? `PR #${p.pr.number}` : 'No PR',
+      description: p.prs.length > 0 ? `PR #${p.prs[0].number}` : 'No PR',
       project: p,
     }));
 
@@ -714,13 +726,13 @@ async function createPRForProject(
   task: Task,
   project: typeof task.projects[0]
 ): Promise<void> {
-  if (project.pr) {
+  if (project.prs.length > 0) {
     const open = await vscode.window.showInformationMessage(
-      `This project already has PR #${project.pr.number}.`,
+      `This project already has PR #${project.prs[0].number}. Use "Link PR" to add another.`,
       'Open PR'
     );
     if (open === 'Open PR') {
-      vscode.env.openExternal(vscode.Uri.parse(project.pr.url));
+      vscode.env.openExternal(vscode.Uri.parse(project.prs[0].url));
     }
     return;
   }
@@ -800,12 +812,12 @@ async function createPRForProject(
     return;
   }
 
-  // Update task with PR info
+  // Update task with PR info - add to prs array
   const updatedProjects = task.projects.map((p) => {
     if (p.name === project.name) {
       return {
         ...p,
-        pr: prDetailsToInfo(prResult.data!),
+        prs: [...p.prs, prDetailsToInfo(prResult.data!)],
       };
     }
     return p;
@@ -824,6 +836,133 @@ async function createPRForProject(
   }
 }
 
+async function linkPRCommand(context: vscode.ExtensionContext): Promise<void> {
+  const task = getCurrentTask();
+  if (!task) {
+    vscode.window.showWarningMessage('This command is only available in a Grove task workspace.');
+    return;
+  }
+
+  const config = readConfig();
+  if (!config.success || !config.data?.git) {
+    vscode.window.showWarningMessage('Git provider not configured. Run "Grove: Setup" first.');
+    return;
+  }
+
+  const token = await context.secrets.get(SECRET_KEYS.GIT_API_TOKEN);
+  if (!token) {
+    vscode.window.showWarningMessage('Git API token not found. Run "Grove: Setup" first.');
+    return;
+  }
+
+  // Let user select a project (if only one project, use it automatically)
+  let targetProject: typeof task.projects[0];
+  if (task.projects.length === 1) {
+    targetProject = task.projects[0];
+  } else {
+    const items = task.projects.map((p) => ({
+      label: p.name,
+      description: p.prs.length > 0 ? `${p.prs.length} PR(s) linked` : 'No PRs',
+      detail: `Branch: ${p.branch}`,
+      project: p,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Select a project to link PR for',
+    });
+
+    if (!selected) {
+      return;
+    }
+    targetProject = selected.project;
+  }
+
+  // Get remote URL to determine owner/repo
+  const remoteResult = await getRemoteUrl(targetProject.repoPath);
+  if (!remoteResult.success || !remoteResult.data) {
+    vscode.window.showErrorMessage('Could not determine remote URL.');
+    return;
+  }
+
+  const owner = extractRepoOwner(remoteResult.data);
+  const repo = extractRepoName(remoteResult.data);
+
+  if (!owner || !repo) {
+    vscode.window.showErrorMessage('Could not parse owner/repo from remote URL.');
+    return;
+  }
+
+  // Find all PRs for branch
+  const client = createGitHubClient();
+  client.setToken(token);
+
+  const searchingMessage = vscode.window.setStatusBarMessage('Searching for PRs...');
+  const prsResult = await client.findAllPRsByBranch(owner, repo, targetProject.branch);
+  searchingMessage.dispose();
+
+  if (!prsResult.success) {
+    vscode.window.showErrorMessage(`Failed to search for PRs: ${prsResult.error}`);
+    return;
+  }
+
+  if (!prsResult.data || prsResult.data.length === 0) {
+    vscode.window.showWarningMessage(
+      `No PR found for branch "${targetProject.branch}". Create one first.`
+    );
+    return;
+  }
+
+  // If multiple PRs, let user choose (open PRs are already sorted first)
+  let selectedPR = prsResult.data[0];
+  if (prsResult.data.length > 1) {
+    const prItems = prsResult.data.map((pr) => ({
+      label: `#${pr.number}: ${pr.title || 'No title'}`,
+      description: pr.status === 'open' ? 'Open' : pr.status === 'merged' ? 'Merged' : 'Closed',
+      detail: `Updated ${new Date(pr.updatedAt || '').toLocaleDateString()}`,
+      pr,
+    }));
+
+    const selected = await vscode.window.showQuickPick(prItems, {
+      placeHolder: `Found ${prsResult.data.length} PRs for this branch. Select one to link:`,
+    });
+
+    if (!selected) {
+      return;
+    }
+    selectedPR = selected.pr;
+  }
+
+  // Check if this PR is already linked
+  const prInfo = prDetailsToInfo(selectedPR);
+  if (targetProject.prs.some((p) => p.number === prInfo.number)) {
+    vscode.window.showInformationMessage(`PR #${prInfo.number} is already linked to this project.`);
+    return;
+  }
+
+  // Update task with PR info - add to prs array
+  const updatedProjects = task.projects.map((p) => {
+    if (p.name === targetProject.name) {
+      return {
+        ...p,
+        prs: [...p.prs, prInfo],
+      };
+    }
+    return p;
+  });
+
+  await updateTask(task.id, { projects: updatedProjects });
+  generateContextFile({ ...task, projects: updatedProjects });
+
+  const open = await vscode.window.showInformationMessage(
+    `Linked PR #${selectedPR.number}: ${selectedPR.title}`,
+    'Open PR'
+  );
+
+  if (open === 'Open PR') {
+    vscode.env.openExternal(vscode.Uri.parse(selectedPR.url));
+  }
+}
+
 async function openPRCommand(): Promise<void> {
   const task = getCurrentTask();
   if (!task) {
@@ -834,12 +973,29 @@ async function openPRCommand(): Promise<void> {
   const project = getCurrentProject(task);
   const targetProject = project || task.projects[0];
 
-  if (!targetProject?.pr) {
+  if (!targetProject || targetProject.prs.length === 0) {
     vscode.window.showInformationMessage('No PR for this project. Use "Grove: Create PR" first.');
     return;
   }
 
-  vscode.env.openExternal(vscode.Uri.parse(targetProject.pr.url));
+  // If multiple PRs, let user choose which to open
+  if (targetProject.prs.length === 1) {
+    vscode.env.openExternal(vscode.Uri.parse(targetProject.prs[0].url));
+  } else {
+    const items = targetProject.prs.map((pr) => ({
+      label: `#${pr.number}: ${pr.title || 'No title'}`,
+      description: pr.status,
+      pr,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Select a PR to open',
+    });
+
+    if (selected) {
+      vscode.env.openExternal(vscode.Uri.parse(selected.pr.url));
+    }
+  }
 }
 
 async function openJiraCommand(): Promise<void> {
@@ -921,7 +1077,7 @@ async function refreshStatusCommand(context: vscode.ExtensionContext): Promise<v
   const refreshingMessage = vscode.window.setStatusBarMessage('Refreshing status...');
 
   for (const project of task.projects) {
-    if (!project.pr) {
+    if (project.prs.length === 0) {
       continue;
     }
 
@@ -937,9 +1093,12 @@ async function refreshStatusCommand(context: vscode.ExtensionContext): Promise<v
       continue;
     }
 
-    const prResult = await client.getPR(owner, repo, project.pr.number);
-    if (prResult.success && prResult.data) {
-      project.pr = prDetailsToInfo(prResult.data);
+    // Update all PRs for this project
+    for (let i = 0; i < project.prs.length; i++) {
+      const prResult = await client.getPR(owner, repo, project.prs[i].number);
+      if (prResult.success && prResult.data) {
+        project.prs[i] = prDetailsToInfo(prResult.data);
+      }
     }
   }
 

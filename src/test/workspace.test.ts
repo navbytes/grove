@@ -22,7 +22,7 @@ describe('workspace', () => {
         worktreePath: '/workspaces/TASK-200/backend-api',
         branch: 'TASK-200-add-user-preferences',
         baseBranch: 'main',
-        pr: null,
+        prs: [],
       },
       {
         name: 'web-ui',
@@ -30,12 +30,13 @@ describe('workspace', () => {
         worktreePath: '/workspaces/TASK-200/web-ui',
         branch: 'TASK-200-add-user-preferences',
         baseBranch: 'main',
-        pr: null,
+        prs: [],
       },
     ],
     workspaceFile: '/workspaces/TASK-200/TASK-200.code-workspace',
     notes: '',
     slackThreads: [],
+    links: [],
   };
 
   describe('createWorkspaceContent', () => {

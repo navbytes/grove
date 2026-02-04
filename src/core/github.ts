@@ -169,8 +169,10 @@ export class GitHubClient implements GitProviderClient {
         return { success: true, data: null };
       }
 
-      // Get the most recent PR (first in the list)
-      const pr = prs[0];
+      // Prioritize open PRs over closed/merged ones
+      // If multiple open PRs exist, take the most recent (first in list)
+      const openPR = prs.find((p) => p.state === 'open');
+      const pr = openPR || prs[0];
       const details = this.mapPRToDetails(pr, owner, repo);
 
       // Get review status
@@ -190,6 +192,51 @@ export class GitHubClient implements GitProviderClient {
       return {
         success: false,
         error: `Failed to find PR: ${error}`,
+      };
+    }
+  }
+
+  async findAllPRsByBranch(
+    owner: string,
+    repo: string,
+    branch: string
+  ): Promise<OperationResult<PRDetails[]>> {
+    try {
+      const response = await fetchWithAuth(
+        `${this.baseUrl}/repos/${owner}/${repo}/pulls?head=${owner}:${branch}&state=all`,
+        this.token
+      );
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `Failed to find PRs: ${response.status}`,
+        };
+      }
+
+      const prs = (await response.json()) as GitHubPR[];
+
+      if (prs.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Sort: open PRs first, then by updated date (most recent first)
+      const sortedPRs = prs.sort((a, b) => {
+        if (a.state === 'open' && b.state !== 'open') return -1;
+        if (a.state !== 'open' && b.state === 'open') return 1;
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      });
+
+      // Map all PRs to details (without fetching review/CI status for performance)
+      const allDetails: PRDetails[] = sortedPRs.map((pr) =>
+        this.mapPRToDetails(pr, owner, repo)
+      );
+
+      return { success: true, data: allDetails };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to find PRs: ${error}`,
       };
     }
   }

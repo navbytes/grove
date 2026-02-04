@@ -26,6 +26,7 @@ import { addTask, updateTask, deleteTask, getTask, readTasks } from './store';
 import { createWorktree, removeWorktree, hasUncommittedChanges } from './worktree';
 import { generateWorkspaceFile, getWorkspaceFilePath } from './workspace';
 import { generateContextFile, getContextFilePath, preserveNotes } from './context';
+import { executeWorktreeSetup, hasWorktreeSetup } from './worktree-setup';
 
 export interface CreateTaskOptions {
   ticketIds: string[];
@@ -116,13 +117,18 @@ export async function createTask(options: CreateTaskOptions): Promise<OperationR
       };
     }
 
+    // Run worktree setup if configured
+    if (hasWorktreeSetup(project)) {
+      await executeWorktreeSetup(project, worktreePath);
+    }
+
     taskProjects.push({
       name: projectName,
       repoPath: expandPath(project.path),
       worktreePath,
       branch,
       baseBranch: project.defaultBaseBranch,
-      pr: null,
+      prs: [],
     });
   }
 
@@ -221,6 +227,11 @@ export async function addProjectToTask(
     };
   }
 
+  // Run worktree setup if configured
+  if (hasWorktreeSetup(project)) {
+    await executeWorktreeSetup(project, worktreePath);
+  }
+
   // Add project to task
   const taskProject: TaskProject = {
     name: projectName,
@@ -228,7 +239,7 @@ export async function addProjectToTask(
     worktreePath,
     branch,
     baseBranch: project.defaultBaseBranch,
-    pr: null,
+    prs: [],
   };
 
   task.projects.push(taskProject);
