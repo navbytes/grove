@@ -11,9 +11,14 @@ import {
   DEFAULT_CONFIG,
   SECRET_KEYS,
   GitProvider,
+  WorktreeSetup,
+  CopyRule,
+  CopyMode,
+  Project,
 } from '../core/types';
 import { writeConfig, expandPath, ensureWorkspaceDir } from '../core/config';
-import { registerProject, detectDefaultBranch } from '../core/projects';
+import { registerProject, detectDefaultBranch, updateProject, getProject } from '../core/projects';
+import { getCombinedSetup } from '../core/worktree-setup';
 import { createJiraClient } from '../core/jira';
 import { createGitHubClient } from '../core/github';
 
@@ -428,6 +433,22 @@ export async function registerProjectWizard(): Promise<boolean> {
   }
 
   vscode.window.showInformationMessage(`Project "${projectName}" registered successfully!`);
+
+  // Offer to configure worktree setup
+  const configureSetup = await vscode.window.showQuickPick(
+    [
+      { label: 'Yes', description: 'Configure files to copy and commands to run' },
+      { label: 'Skip', description: 'Configure later with "Grove: Configure Worktree Setup"' },
+    ],
+    {
+      placeHolder: 'Configure worktree setup? (copy files, run commands on new worktrees)',
+    }
+  );
+
+  if (configureSetup?.label === 'Yes') {
+    await configureWorktreeSetupWizard(projectName);
+  }
+
   return true;
 }
 
@@ -443,5 +464,241 @@ export async function editSettings(): Promise<void> {
     await vscode.window.showTextDocument(doc);
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to open settings: ${error}`);
+  }
+}
+
+/**
+ * Configure worktree setup for a project
+ */
+export async function configureWorktreeSetupWizard(projectName?: string): Promise<boolean> {
+  // If no project name provided, let user select
+  if (!projectName) {
+    const { readProjects } = await import('../core/projects');
+    const projectsResult = readProjects();
+    if (!projectsResult.success || !projectsResult.data || projectsResult.data.length === 0) {
+      vscode.window.showWarningMessage('No projects registered. Register a project first.');
+      return false;
+    }
+
+    const selected = await vscode.window.showQuickPick(
+      projectsResult.data.map((p) => ({
+        label: p.name,
+        description: p.path,
+        project: p,
+      })),
+      {
+        placeHolder: 'Select project to configure worktree setup',
+      }
+    );
+
+    if (!selected) {
+      return false;
+    }
+
+    projectName = selected.project.name;
+  }
+
+  // Get the project
+  const projectResult = getProject(projectName);
+  if (!projectResult.success || !projectResult.data) {
+    vscode.window.showErrorMessage(`Project "${projectName}" not found`);
+    return false;
+  }
+
+  const project = projectResult.data;
+
+  // Get current combined setup (repo + project)
+  const currentSetup = getCombinedSetup(project);
+
+  // Main menu loop
+  while (true) {
+    const menuItems: vscode.QuickPickItem[] = [
+      { label: '$(add) Add file/folder rule', description: 'Copy or symlink files to new worktrees' },
+      { label: '$(terminal) Add post-create command', description: 'Run command after worktree creation' },
+    ];
+
+    // Show current rules
+    const setup = project.worktreeSetup || { copyFiles: [], postCreateCommands: [] };
+
+    if (setup.copyFiles && setup.copyFiles.length > 0) {
+      menuItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+      for (const rule of setup.copyFiles) {
+        menuItems.push({
+          label: `$(file) ${rule.source}`,
+          description: `${rule.mode}${rule.destination ? ` → ${rule.destination}` : ''}`,
+          detail: 'Click to remove',
+        });
+      }
+    }
+
+    if (setup.postCreateCommands && setup.postCreateCommands.length > 0) {
+      menuItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+      for (const cmd of setup.postCreateCommands) {
+        menuItems.push({
+          label: `$(terminal) ${cmd}`,
+          description: 'command',
+          detail: 'Click to remove',
+        });
+      }
+    }
+
+    menuItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+    menuItems.push({ label: '$(check) Done', description: 'Save and exit' });
+
+    const choice = await vscode.window.showQuickPick(menuItems, {
+      placeHolder: `Worktree Setup for "${projectName}"`,
+      title: 'Configure Worktree Setup',
+    });
+
+    if (!choice || choice.label === '$(check) Done') {
+      break;
+    }
+
+    if (choice.label === '$(add) Add file/folder rule') {
+      const rule = await addCopyRuleWizard();
+      if (rule) {
+        if (!project.worktreeSetup) {
+          project.worktreeSetup = { copyFiles: [], postCreateCommands: [] };
+        }
+        if (!project.worktreeSetup.copyFiles) {
+          project.worktreeSetup.copyFiles = [];
+        }
+        project.worktreeSetup.copyFiles.push(rule);
+        await saveProjectSetup(project);
+      }
+    } else if (choice.label === '$(terminal) Add post-create command') {
+      const cmd = await addPostCreateCommandWizard();
+      if (cmd) {
+        if (!project.worktreeSetup) {
+          project.worktreeSetup = { copyFiles: [], postCreateCommands: [] };
+        }
+        if (!project.worktreeSetup.postCreateCommands) {
+          project.worktreeSetup.postCreateCommands = [];
+        }
+        project.worktreeSetup.postCreateCommands.push(cmd);
+        await saveProjectSetup(project);
+      }
+    } else if (choice.label.startsWith('$(file)')) {
+      // Remove copy rule
+      const sourcePath = choice.label.replace('$(file) ', '');
+      if (project.worktreeSetup?.copyFiles) {
+        const index = project.worktreeSetup.copyFiles.findIndex((r) => r.source === sourcePath);
+        if (index !== -1) {
+          const confirm = await vscode.window.showWarningMessage(
+            `Remove rule for "${sourcePath}"?`,
+            { modal: true },
+            'Remove'
+          );
+          if (confirm === 'Remove') {
+            project.worktreeSetup.copyFiles.splice(index, 1);
+            await saveProjectSetup(project);
+          }
+        }
+      }
+    } else if (choice.label.startsWith('$(terminal)') && choice.description === 'command') {
+      // Remove command
+      const cmd = choice.label.replace('$(terminal) ', '');
+      if (project.worktreeSetup?.postCreateCommands) {
+        const index = project.worktreeSetup.postCreateCommands.indexOf(cmd);
+        if (index !== -1) {
+          const confirm = await vscode.window.showWarningMessage(
+            `Remove command "${cmd}"?`,
+            { modal: true },
+            'Remove'
+          );
+          if (confirm === 'Remove') {
+            project.worktreeSetup.postCreateCommands.splice(index, 1);
+            await saveProjectSetup(project);
+          }
+        }
+      }
+    }
+  }
+
+  vscode.window.showInformationMessage(`Worktree setup saved for "${projectName}"`);
+  return true;
+}
+
+/**
+ * Add a copy rule via wizard
+ */
+async function addCopyRuleWizard(): Promise<CopyRule | null> {
+  // Source path
+  const source = await vscode.window.showInputBox({
+    prompt: 'Source file or folder path',
+    placeHolder: '.env.local or certs/ or ~/.ssl/cert.pem',
+    validateInput: (value) => {
+      if (!value.trim()) {
+        return 'Source path is required';
+      }
+      return undefined;
+    },
+  });
+
+  if (!source) {
+    return null;
+  }
+
+  // Destination path (optional)
+  const destination = await vscode.window.showInputBox({
+    prompt: 'Destination path in worktree (leave empty for same location)',
+    placeHolder: source,
+  });
+
+  // Copy mode
+  const modeChoice = await vscode.window.showQuickPick(
+    [
+      {
+        label: 'Copy',
+        value: 'copy' as CopyMode,
+        description: 'Create a copy of the file (for .env files that may differ)',
+      },
+      {
+        label: 'Symlink',
+        value: 'symlink' as CopyMode,
+        description: 'Create a symbolic link (for shared resources like certs)',
+      },
+    ],
+    {
+      placeHolder: 'How should this file be set up?',
+    }
+  );
+
+  if (!modeChoice) {
+    return null;
+  }
+
+  return {
+    source: source.trim(),
+    destination: destination?.trim() || undefined,
+    mode: modeChoice.value,
+  };
+}
+
+/**
+ * Add a post-create command via wizard
+ */
+async function addPostCreateCommandWizard(): Promise<string | null> {
+  const command = await vscode.window.showInputBox({
+    prompt: 'Command to run after worktree creation',
+    placeHolder: 'npm install, poetry install, ./scripts/setup.sh',
+    validateInput: (value) => {
+      if (!value.trim()) {
+        return 'Command is required';
+      }
+      return undefined;
+    },
+  });
+
+  return command?.trim() || null;
+}
+
+/**
+ * Save project worktree setup
+ */
+async function saveProjectSetup(project: Project): Promise<void> {
+  const result = updateProject(project.name, { worktreeSetup: project.worktreeSetup });
+  if (!result.success) {
+    vscode.window.showErrorMessage(`Failed to save setup: ${result.error}`);
   }
 }

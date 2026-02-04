@@ -1,6 +1,6 @@
 # Core Module Knowledge
 
-> **Auto-update trigger**: Update this file when modifying any file in `src/core/` except `types.ts`, `github.ts`, or `jira.ts`.
+> **Auto-update trigger**: Update this file when modifying any file in `src/core/` except `types.ts`, `github.ts`, `jira.ts`, or `git-provider.ts`.
 
 ## Overview
 
@@ -12,9 +12,10 @@ The `src/core/` directory contains pure TypeScript business logic with **zero VS
 |------|---------|-------------|
 | `config.ts` | Config file management (~/.grove/) | `readConfig`, `writeConfig`, `getTaskDir`, `generateBranchName` |
 | `store.ts` | Task persistence (tasks.json) | `readTasks`, `getTask`, `addTask`, `updateTask`, `deleteTask` |
-| `projects.ts` | Project registry management | `readProjects`, `registerProject`, `getProject`, `detectDefaultBranch` |
+| `projects.ts` | Project registry management | `readProjects`, `registerProject`, `getProject`, `updateProject`, `detectDefaultBranch` |
 | `tasks.ts` | High-level task operations | `createTask`, `addProjectToTask`, `archiveTask`, `addSlackThread`, `addLink` |
 | `worktree.ts` | Git worktree CLI wrapper | `createWorktree`, `removeWorktree`, `pushBranch`, `execGit` |
+| `worktree-setup.ts` | Worktree post-creation setup | `executeWorktreeSetup`, `readRepoSetup`, `hasWorktreeSetup` |
 | `workspace.ts` | VS Code workspace file generation | `generateWorkspaceFile`, `getWorkspaceFilePath` |
 | `context.ts` | .grove-context.md generation | `generateContextFile`, `preserveNotes` |
 
@@ -122,6 +123,39 @@ isBranchPushed(repoPath: string, branch: string): Promise<OperationResult<boolea
 // Status checks
 hasUncommittedChanges(worktreePath: string): Promise<OperationResult<boolean>>
 ```
+
+### worktree-setup.ts (src/core/worktree-setup.ts)
+
+Post-creation setup for worktrees (copy files, run commands):
+
+```typescript
+// Read .grove/setup.json from repo root
+readRepoSetup(repoPath: string): WorktreeSetup | null
+
+// Merge repo-level and project-level setup
+mergeSetups(repoSetup: WorktreeSetup | null, projectSetup: WorktreeSetup | undefined): WorktreeSetup
+
+// Execute a single copy/symlink rule
+executeCopyRule(rule: CopyRule, repoPath: string, worktreePath: string): OperationResult
+
+// Execute a shell command in directory
+executeCommand(command: string, cwd: string): Promise<OperationResult>
+
+// Execute all setup rules for a project
+executeWorktreeSetup(project: Project, worktreePath: string, onProgress?: (msg: string) => void): Promise<OperationResult>
+
+// Check if project has any setup configured
+hasWorktreeSetup(project: Project): boolean
+
+// Get combined setup for display
+getCombinedSetup(project: Project): WorktreeSetup
+```
+
+**Setup execution flow:**
+1. Read `.grove/setup.json` from repo (if exists)
+2. Merge with project's `worktreeSetup` config
+3. Execute copy/symlink rules (warnings logged, continues on failure)
+4. Execute post-create commands (warnings logged, continues on failure)
 
 ### projects.ts (src/core/projects.ts)
 

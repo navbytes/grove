@@ -40,7 +40,7 @@ import { createJiraClient, JiraClient } from '../core/jira';
 import { createGitHubClient, GitHubClient } from '../core/github';
 import { prDetailsToInfo } from '../core/git-provider';
 import { extractRepoOwner, extractRepoName, getRemoteUrl } from '../core/projects';
-import { showSetupWizard, registerProjectWizard, editSettings } from './setup';
+import { showSetupWizard, registerProjectWizard, editSettings, configureWorktreeSetupWizard } from './setup';
 import { GroveSidebarProvider } from './sidebar';
 
 /**
@@ -75,6 +75,12 @@ export function registerCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand('grove.editSettings', editSettings)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.configureWorktreeSetup', (item?: { data?: { project?: Project } }) =>
+      configureWorktreeSetupWizard(item?.data?.project?.name).then(() => sidebarProvider.refresh())
+    )
   );
 
   // Task Management Commands

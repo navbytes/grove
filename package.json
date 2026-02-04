@@ -64,6 +64,11 @@
         "category": "Grove"
       },
       {
+        "command": "grove.configureWorktreeSetup",
+        "title": "Grove: Configure Worktree Setup",
+        "category": "Grove"
+      },
+      {
         "command": "grove.newTask",
         "title": "Grove: New Task",
         "category": "Grove"
@@ -292,6 +297,11 @@
           "command": "grove.removeProjectFromTask",
           "when": "view == groveExplorer && viewItem == taskProject",
           "group": "3_danger"
+        },
+        {
+          "command": "grove.configureWorktreeSetup",
+          "when": "view == groveExplorer && viewItem == registeredProject",
+          "group": "2_setup"
         },
         {
           "command": "grove.removeProject",

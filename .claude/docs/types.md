@@ -50,8 +50,32 @@ interface Project {
   path: string;              // Repo path (supports ~/)
   defaultBaseBranch: string; // main or develop
   remoteUrl?: string;        // Git remote URL
+  worktreeSetup?: WorktreeSetup; // Optional setup for new worktrees
 }
 ```
+
+### WorktreeSetup (Worktree initialization config)
+
+```typescript
+interface WorktreeSetup {
+  copyFiles?: CopyRule[];        // Files/folders to copy or symlink
+  postCreateCommands?: string[]; // Commands to run after creation (e.g., "npm install")
+}
+
+interface CopyRule {
+  source: string;       // Relative to repo, or absolute path (supports ~/)
+  destination?: string; // Target in worktree (defaults to source)
+  mode: CopyMode;       // 'copy' | 'symlink'
+}
+
+type CopyMode = 'copy' | 'symlink';
+```
+
+**Configuration sources:**
+1. **Project-level**: `~/.grove/projects.json` - per-project `worktreeSetup` field
+2. **Repo-level**: `.grove/setup.json` in repository root (team-shared)
+
+Both are merged, with project-level additions appended to repo-level rules.
 
 ### PRInfo (Pull request tracking)
 

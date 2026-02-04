@@ -17,6 +17,7 @@ All commands are registered in `src/extension/commands.ts` via `registerCommands
 | `grove.removeProject` | Grove: Remove Project | Unregister a project |
 | `grove.listProjects` | Grove: List Projects | Show all registered projects |
 | `grove.editSettings` | Grove: Edit Settings | Open settings editor |
+| `grove.configureWorktreeSetup` | Grove: Configure Worktree Setup | Configure files to copy/symlink and commands to run when creating worktrees |
 
 ### Task Management
 
