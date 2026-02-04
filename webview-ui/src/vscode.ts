@@ -1,18 +1,18 @@
-import type { DashboardData, MessageToExtension } from './types';
+import type { MessageToExtension, SetupMessageToExtension, WebviewState } from './types';
 
 // Wrapper for VS Code API
 class VSCodeAPI {
   private readonly vscode = acquireVsCodeApi();
 
-  public postMessage(message: MessageToExtension): void {
+  public postMessage(message: MessageToExtension | SetupMessageToExtension): void {
     this.vscode.postMessage(message);
   }
 
-  public getState(): DashboardData | undefined {
+  public getState(): WebviewState | undefined {
     return this.vscode.getState();
   }
 
-  public setState(state: DashboardData): void {
+  public setState(state: WebviewState): void {
     this.vscode.setState(state);
   }
 }

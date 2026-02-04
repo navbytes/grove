@@ -15,7 +15,8 @@ The `src/extension/` directory contains VS Code-specific integration. These file
 | `sidebar.ts` | Tree view provider | `GroveSidebarProvider` |
 | `statusbar.ts` | Status bar widget | `GroveStatusBar` |
 | `polling.ts` | Background PR/CI polling | `GrovePolling` |
-| `setup.ts` | Setup wizard flows | `showSetupWizard`, `registerProjectWizard` |
+| `setup.ts` | Wizard utilities (project registration, worktree setup) | `registerProjectWizard`, `configureWorktreeSetupWizard` |
+| `setup-panel.ts` | Webview setup panel | `GroveSetupPanel` |
 | `dashboard.ts` | Webview dashboard panel | `GroveDashboardPanel` |
 
 ## Extension Lifecycle (extension.ts)
@@ -175,6 +176,52 @@ panel.webview.onDidReceiveMessage(message => {
 });
 ```
 
+## Setup Panel (setup-panel.ts)
+
+Webview panel for initial Grove configuration. Provides a rich form-based UI instead of the traditional multi-step VS Code input dialogs.
+
+### Features
+
+- **All-in-one form**: Workspace, Git provider, and Jira settings visible together
+- **Connection testing**: Validate credentials before saving
+- **Helper links**: Direct links to token generation pages
+- **Folder browser**: Native folder picker for workspace directory
+
+### Usage
+
+```typescript
+// Show setup panel (used on first run or via grove.setup command)
+GroveSetupPanel.createOrShow(context, (completed) => {
+  if (completed) {
+    sidebarProvider.refresh();
+    polling.start();
+  }
+});
+```
+
+### Message Flow
+
+```
+SetupPanel.createOrShow()
+    │
+    ├── Creates webview with same JS as dashboard
+    │
+    ↓
+Webview receives 'init' message → Shows SetupForm.svelte
+    │
+    ├── User fills form, tests connections
+    │
+    ├── postMessage({ type: 'save', data: {...} })
+    │
+    ↓
+SetupPanel handles 'save'
+    │
+    ├── Writes config to ~/.grove/config.json
+    ├── Stores tokens in VS Code SecretStorage
+    ├── Calls onComplete(true) callback
+    └── Closes panel
+```
+
 ## Common Modifications
 
 ### Adding a new tree item type
@@ -196,4 +243,4 @@ panel.webview.onDidReceiveMessage(message => {
 2. Update display in `update()` method
 
 ---
-*Last updated: 2026-02-03*
+*Last updated: 2026-02-04*

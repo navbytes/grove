@@ -8,8 +8,8 @@ import { registerCommands } from './commands';
 import { GroveSidebarProvider } from './sidebar';
 import { GroveStatusBar } from './statusbar';
 import { GrovePolling } from './polling';
-import { showSetupWizard } from './setup';
 import { GroveDashboardPanel } from './dashboard';
+import { GroveSetupPanel } from './setup-panel';
 
 let statusBar: GroveStatusBar | undefined;
 let polling: GrovePolling | undefined;
@@ -56,6 +56,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Initialize polling
   polling = new GrovePolling(context, sidebarProvider, statusBar);
 
+  // Register setup command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grove.openSetup', () => {
+      GroveSetupPanel.createOrShow(context, (completed) => {
+        if (completed) {
+          sidebarProvider?.refresh();
+          polling?.start();
+        }
+      });
+    })
+  );
+
   // Check if setup is needed
   if (!isGroveSetup()) {
     const choice = await vscode.window.showInformationMessage(
@@ -65,8 +77,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     if (choice === 'Set Up Grove') {
-      await showSetupWizard(context);
-      sidebarProvider.refresh();
+      GroveSetupPanel.createOrShow(context, (completed) => {
+        if (completed) {
+          sidebarProvider?.refresh();
+          polling?.start();
+        }
+      });
     }
   } else {
     // Start polling if already set up

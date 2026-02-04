@@ -80,11 +80,68 @@ export type MessageToExtension =
   | { type: 'refresh' }
   | { type: 'ready' };
 
+// ============================================
+// Setup Types
+// ============================================
+
+export type GitProvider = 'github' | 'gitlab' | 'bitbucket';
+
+export interface SetupConfig {
+  workspaceDir: string;
+  branchTemplate: string;
+  jira?: {
+    baseUrl: string;
+    email: string;
+  };
+  git?: {
+    provider: GitProvider;
+    baseUrl: string;
+    org: string;
+  };
+}
+
+export interface SetupData {
+  config: SetupConfig;
+  gitToken?: string;
+  jiraToken?: string;
+}
+
+export interface ConnectionTestResult {
+  success: boolean;
+  error?: string;
+}
+
+// Messages from webview to extension (Setup)
+export type SetupMessageToExtension =
+  | { type: 'ready' }
+  | { type: 'save'; data: SetupData }
+  | { type: 'testJira'; baseUrl: string; email: string; token: string }
+  | { type: 'testGit'; provider: GitProvider; baseUrl: string; org: string; token: string }
+  | { type: 'skip' }
+  | { type: 'openExternal'; url: string }
+  | { type: 'browseFolder' };
+
+// Messages from extension to webview (Setup)
+export type SetupMessageToWebview =
+  | { type: 'init'; config?: SetupConfig }
+  | { type: 'jiraTestResult'; result: ConnectionTestResult }
+  | { type: 'gitTestResult'; result: ConnectionTestResult }
+  | { type: 'folderSelected'; path: string }
+  | { type: 'saved' }
+  | { type: 'error'; message: string };
+
+// Combined state for webview
+export interface WebviewState {
+  mode: 'dashboard' | 'setup';
+  dashboardData?: DashboardData;
+  setupConfig?: SetupConfig;
+}
+
 // VS Code API type
 declare global {
   function acquireVsCodeApi(): {
-    postMessage(message: MessageToExtension): void;
-    getState(): DashboardData | undefined;
-    setState(state: DashboardData): void;
+    postMessage(message: MessageToExtension | SetupMessageToExtension): void;
+    getState(): WebviewState | undefined;
+    setState(state: WebviewState): void;
   };
 }

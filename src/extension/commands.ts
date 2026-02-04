@@ -40,8 +40,9 @@ import { createJiraClient, JiraClient } from '../core/jira';
 import { createGitHubClient, GitHubClient } from '../core/github';
 import { prDetailsToInfo } from '../core/git-provider';
 import { extractRepoOwner, extractRepoName, getRemoteUrl } from '../core/projects';
-import { showSetupWizard, registerProjectWizard, editSettings, configureWorktreeSetupWizard } from './setup';
+import { registerProjectWizard, editSettings, configureWorktreeSetupWizard } from './setup';
 import { GroveSidebarProvider } from './sidebar';
+import { GroveSetupPanel } from './setup-panel';
 
 /**
  * Register all Grove commands
@@ -52,9 +53,13 @@ export function registerCommands(
 ): void {
   // Setup & Configuration Commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('grove.setup', () =>
-      showSetupWizard(context).then(() => sidebarProvider.refresh())
-    )
+    vscode.commands.registerCommand('grove.setup', () => {
+      GroveSetupPanel.createOrShow(context, (completed) => {
+        if (completed) {
+          sidebarProvider.refresh();
+        }
+      });
+    })
   );
 
   context.subscriptions.push(
@@ -311,7 +316,7 @@ async function newTaskCommand(context: vscode.ExtensionContext): Promise<void> {
       'Set Up Grove'
     );
     if (setup === 'Set Up Grove') {
-      await showSetupWizard(context);
+      GroveSetupPanel.createOrShow(context);
     }
     return;
   }
