@@ -154,7 +154,7 @@ export function executeCopyRule(
 export function executeCommand(
   command: string,
   cwd: string
-): Promise<OperationResult> {
+): Promise<OperationResult<string>> {
   return new Promise((resolve) => {
     const expandedCwd = expandPath(cwd);
     const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
