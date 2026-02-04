@@ -11,7 +11,7 @@ The webview dashboard is a Svelte 5 application that runs inside a VS Code webvi
 ```
 webview-ui/
 ├── src/
-│   ├── App.svelte              # Main dashboard component
+│   ├── App.svelte              # Main app (handles both dashboard and setup modes)
 │   ├── main.ts                 # Entry point
 │   ├── vscode.ts               # VS Code API wrapper
 │   ├── types.ts                # Type definitions
@@ -20,7 +20,8 @@ webview-ui/
 │   │   ├── TaskCard.svelte     # Task card component
 │   │   ├── ProjectRow.svelte   # Project row in task card
 │   │   ├── StatusBadge.svelte  # PR/CI status badges
-│   │   └── EmptyState.svelte   # Empty state display
+│   │   ├── EmptyState.svelte   # Empty state display
+│   │   └── SetupForm.svelte    # Initial setup form
 │   └── styles/
 │       └── global.css          # Global styles
 ├── vite.config.ts              # Vite build config
@@ -98,7 +99,7 @@ interface DashboardData {
 }
 ```
 
-### Webview → Extension
+### Webview → Extension (Dashboard)
 
 ```typescript
 type MessageToExtension =
@@ -114,6 +115,29 @@ type MessageToExtension =
   | { type: 'createPR'; taskId: string; projectName: string }
   | { type: 'refresh' }
   | { type: 'ready' };
+```
+
+### Setup Messages (Extension ↔ Webview)
+
+```typescript
+// Extension → Webview
+type SetupMessageToWebview =
+  | { type: 'init'; config?: SetupConfig }
+  | { type: 'jiraTestResult'; result: ConnectionTestResult }
+  | { type: 'gitTestResult'; result: ConnectionTestResult }
+  | { type: 'folderSelected'; path: string }
+  | { type: 'saved' }
+  | { type: 'error'; message: string };
+
+// Webview → Extension
+type SetupMessageToExtension =
+  | { type: 'ready' }
+  | { type: 'save'; data: SetupData }
+  | { type: 'testJira'; baseUrl: string; email: string; token: string }
+  | { type: 'testGit'; provider: GitProvider; baseUrl: string; org: string; token: string }
+  | { type: 'skip' }
+  | { type: 'openExternal'; url: string }
+  | { type: 'browseFolder' };
 ```
 
 ## VS Code API Wrapper (vscode.ts)
@@ -133,7 +157,35 @@ class VSCodeAPI {
 export const vscode = new VSCodeAPI();
 ```
 
+## Webview Modes
+
+The webview supports two modes:
+
+### Dashboard Mode (default)
+- Shows task list with filtering
+- PR/CI status overview
+- Quick actions
+
+### Setup Mode
+- Initial configuration form
+- Git provider setup (GitHub/GitLab/Bitbucket)
+- Jira integration setup
+- Connection testing
+
+Mode is determined by the message type sent from extension:
+- `{ type: 'update', data }` → Dashboard mode
+- `{ type: 'init', config }` → Setup mode
+
 ## Components
+
+### SetupForm.svelte
+
+Rich form for initial Grove configuration:
+- **Workspace Settings**: directory and branch template
+- **Git Provider**: provider selection, base URL, org, token
+- **Jira Integration**: base URL, email, API token
+- **Connection Testing**: inline validation with test buttons
+- **Helper Links**: direct links to token generation pages
 
 ### TaskCard.svelte
 
@@ -235,4 +287,4 @@ Uses Svelte 5 runes:
 - Always use VS Code CSS variables for theming
 
 ---
-*Last updated: 2026-02-03*
+*Last updated: 2026-02-04*
