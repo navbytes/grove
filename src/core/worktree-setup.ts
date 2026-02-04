@@ -154,7 +154,7 @@ export function executeCopyRule(
 export function executeCommand(
   command: string,
   cwd: string
-): Promise<OperationResult> {
+): Promise<OperationResult<string>> {
   return new Promise((resolve) => {
     const expandedCwd = expandPath(cwd);
     const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
@@ -168,15 +168,15 @@ export function executeCommand(
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (data) => {
+    proc.stdout.on('data', (data: Buffer) => {
       stdout += data.toString();
     });
 
-    proc.stderr.on('data', (data) => {
+    proc.stderr.on('data', (data: Buffer) => {
       stderr += data.toString();
     });
 
-    proc.on('close', (code) => {
+    proc.on('close', (code: number | null) => {
       if (code === 0) {
         resolve({ success: true, data: stdout });
       } else {
@@ -187,7 +187,7 @@ export function executeCommand(
       }
     });
 
-    proc.on('error', (error) => {
+    proc.on('error', (error: Error) => {
       resolve({
         success: false,
         error: `Failed to execute command: ${error.message}`,
