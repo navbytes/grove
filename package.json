@@ -1,7 +1,7 @@
 {
   "name": "grove-cli",
   "displayName": "Grove",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "grove",
   "description": "Manage cross-repository task workspaces with git worktrees",
   "repository": {
