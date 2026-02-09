@@ -1,0 +1,53 @@
+{
+  "name": "grove-cli",
+  "version": "0.1.0",
+  "description": "Manage cross-repository task workspaces with git worktrees",
+  "type": "module",
+  "bin": {
+    "grove": "./dist/grove.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "bun src/cli/index.ts",
+    "build": "bun build src/cli/index.ts --outfile dist/grove --target bun --compile",
+    "build:js": "bun build src/cli/index.ts --outdir dist --target node --format esm && { echo '#!/usr/bin/env node'; sed '1{/^#!\\/usr\\/bin\\/env/d;}' dist/index.js; } > dist/grove.js && chmod +x dist/grove.js",
+    "prepublishOnly": "bun run build:js",
+    "test": "bun test",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cli",
+    "git",
+    "worktree",
+    "task",
+    "workspace",
+    "multi-repo"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^1.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "fullscreen-ink": "^0.1.0",
+    "ink": "^6.6.0",
+    "open": "^10.1.0",
+    "picocolors": "^1.1.1",
+    "react": "^19.2.4",
+    "react-devtools-core": "^7.0.1",
+    "slugify": "^1.6.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
+    "@types/bun": "^1.1.0",
+    "@types/react": "^19.2.13",
+    "typescript": "^5.7.0"
+  }
+}
