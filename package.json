@@ -13,9 +13,6 @@
     "grove": "./dist/grove.js"
   },
   "main": "./dist/vscode/extension.cjs",
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "dev": "bun src/cli/index.ts",
     "build": "bun build src/cli/index.ts --outfile dist/grove --target bun --compile",
