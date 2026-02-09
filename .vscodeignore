@@ -1,0 +1,13 @@
+src/
+node_modules/
+dist/grove*
+*.test.*
+bun.lock
+bunfig.toml
+biome.json
+tsconfig.json
+tsconfig.vscode.json
+esbuild.vscode.mjs
+.claude/
+docs/
+.gitignore

@@ -1,11 +1,13 @@
 {
   "name": "grove-cli",
+  "displayName": "Grove",
   "version": "0.1.0",
   "description": "Manage cross-repository task workspaces with git worktrees",
   "type": "module",
   "bin": {
     "grove": "./dist/grove.js"
   },
+  "main": "./dist/vscode/extension.cjs",
   "files": [
     "dist"
   ],
@@ -13,15 +15,20 @@
     "dev": "bun src/cli/index.ts",
     "build": "bun build src/cli/index.ts --outfile dist/grove --target bun --compile",
     "build:js": "bun build src/cli/index.ts --outdir dist --target node --format esm && { echo '#!/usr/bin/env node'; sed '1{/^#!\\/usr\\/bin\\/env/d;}' dist/index.js; } > dist/grove.js && chmod +x dist/grove.js",
+    "build:vscode": "node esbuild.vscode.mjs --production",
+    "watch:vscode": "node esbuild.vscode.mjs --watch",
+    "vscode:prepublish": "npm run build:vscode",
     "prepublishOnly": "bun run build:js",
     "test": "bun test",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:vscode": "tsc --noEmit -p tsconfig.vscode.json"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "vscode": "^1.85.0"
   },
   "keywords": [
     "cli",
@@ -32,6 +39,166 @@
     "multi-repo"
   ],
   "license": "MIT",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "grove",
+          "title": "Grove",
+          "icon": "$(list-tree)"
+        }
+      ]
+    },
+    "views": {
+      "grove": [
+        {
+          "id": "groveTasks",
+          "name": "Tasks"
+        },
+        {
+          "id": "groveProjects",
+          "name": "Projects"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "grove.init", "title": "Grove: Initialize" },
+      { "command": "grove.task.new", "title": "Grove: New Task", "icon": "$(add)" },
+      { "command": "grove.task.open", "title": "Grove: Open Task" },
+      { "command": "grove.task.archive", "title": "Grove: Archive Task" },
+      { "command": "grove.task.delete", "title": "Grove: Delete Task" },
+      { "command": "grove.task.addProject", "title": "Grove: Add Project to Task" },
+      { "command": "grove.task.removeProject", "title": "Grove: Remove Project from Task" },
+      { "command": "grove.task.status", "title": "Grove: Show Task Status" },
+      { "command": "grove.pr.create", "title": "Grove: Create Pull Request", "icon": "$(git-pull-request-create)" },
+      { "command": "grove.pr.open", "title": "Grove: Open PR in Browser", "icon": "$(link-external)" },
+      { "command": "grove.pr.status", "title": "Grove: Refresh PR Status" },
+      { "command": "grove.ci.open", "title": "Grove: Open CI in Browser" },
+      { "command": "grove.jira.open", "title": "Grove: Open Jira Ticket" },
+      { "command": "grove.link.add", "title": "Grove: Add Link", "icon": "$(add)" },
+      { "command": "grove.link.open", "title": "Grove: Open Link" },
+      { "command": "grove.link.remove", "title": "Grove: Remove Link" },
+      { "command": "grove.notes.open", "title": "Grove: Open Task Notes" },
+      { "command": "grove.context.regenerate", "title": "Grove: Regenerate Context" },
+      { "command": "grove.refresh", "title": "Grove: Refresh All Status", "icon": "$(refresh)" },
+      { "command": "grove.dashboard", "title": "Grove: Open Dashboard" },
+      { "command": "grove.config.edit", "title": "Grove: Edit Config File" },
+      { "command": "grove.project.add", "title": "Grove: Register Project", "icon": "$(add)" },
+      { "command": "grove.project.remove", "title": "Grove: Remove Project" },
+      { "command": "grove.project.setup", "title": "Grove: Configure Worktree Setup" },
+      { "command": "grove.setToken", "title": "Grove: Set API Token" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "grove.task.new", "when": "view == groveTasks", "group": "navigation" },
+        { "command": "grove.refresh", "when": "view == groveTasks", "group": "navigation" },
+        { "command": "grove.project.add", "when": "view == groveProjects", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "grove.task.open", "when": "view == groveTasks && viewItem == groveTask", "group": "1_open@1" },
+        { "command": "grove.notes.open", "when": "view == groveTasks && viewItem =~ /^groveTask/", "group": "1_open@2" },
+        { "command": "grove.jira.open", "when": "view == groveTasks && viewItem =~ /^groveTask/", "group": "1_open@3" },
+        { "command": "grove.task.addProject", "when": "view == groveTasks && viewItem == groveTask", "group": "2_modify@1" },
+        { "command": "grove.link.add", "when": "view == groveTasks && viewItem == groveTask", "group": "2_modify@2" },
+        { "command": "grove.pr.create", "when": "view == groveTasks && viewItem == groveTask", "group": "2_modify@3" },
+        { "command": "grove.context.regenerate", "when": "view == groveTasks && viewItem == groveTask", "group": "2_modify@4" },
+        { "command": "grove.task.archive", "when": "view == groveTasks && viewItem == groveTask", "group": "3_lifecycle@1" },
+        { "command": "grove.task.delete", "when": "view == groveTasks && viewItem =~ /^groveTask/", "group": "3_lifecycle@2" },
+        { "command": "grove.task.open", "when": "view == groveTasks && viewItem == groveTaskProject", "group": "1_open@1" },
+        { "command": "grove.pr.create", "when": "view == groveTasks && viewItem == groveTaskProjectNoPR", "group": "inline" },
+        { "command": "grove.pr.open", "when": "view == groveTasks && viewItem == groveTaskProjectWithPR", "group": "inline" },
+        { "command": "grove.ci.open", "when": "view == groveTasks && viewItem =~ /^groveTaskProject/", "group": "2_actions@1" },
+        { "command": "grove.task.removeProject", "when": "view == groveTasks && viewItem =~ /^groveTaskProject/", "group": "3_lifecycle@1" },
+        { "command": "grove.link.open", "when": "view == groveTasks && viewItem == groveLink", "group": "inline" },
+        { "command": "grove.link.remove", "when": "view == groveTasks && viewItem == groveLink", "group": "2_actions@1" },
+        { "command": "grove.jira.open", "when": "view == groveTasks && viewItem == groveJiraTicket", "group": "inline" },
+        { "command": "grove.project.remove", "when": "view == groveProjects && viewItem == groveProject", "group": "1_actions@1" },
+        { "command": "grove.project.setup", "when": "view == groveProjects && viewItem == groveProject", "group": "1_actions@2" }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "grove.task.new",
+        "key": "ctrl+shift+g n",
+        "mac": "cmd+shift+g n"
+      },
+      {
+        "command": "grove.task.open",
+        "key": "ctrl+shift+g o",
+        "mac": "cmd+shift+g o"
+      },
+      {
+        "command": "grove.task.status",
+        "key": "ctrl+shift+g s",
+        "mac": "cmd+shift+g s",
+        "when": "grove.taskDetected"
+      },
+      {
+        "command": "grove.refresh",
+        "key": "ctrl+shift+g r",
+        "mac": "cmd+shift+g r"
+      },
+      {
+        "command": "grove.dashboard",
+        "key": "ctrl+shift+g d",
+        "mac": "cmd+shift+g d",
+        "when": "grove.taskDetected"
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "groveTasks",
+        "contents": "No Grove configuration found.\n[Initialize Grove](command:grove.init)\nSet up your workspace directory and integrations to get started.",
+        "when": "!grove.initialized"
+      },
+      {
+        "view": "groveTasks",
+        "contents": "No tasks yet.\n[Create New Task](command:grove.task.new)\nTasks track your work across multiple repositories using git worktrees.",
+        "when": "grove.initialized"
+      },
+      {
+        "view": "groveProjects",
+        "contents": "No projects registered.\n[Register Project](command:grove.project.add)\nProjects are git repositories that Grove manages worktrees for.",
+        "when": "grove.initialized"
+      },
+      {
+        "view": "groveProjects",
+        "contents": "Initialize Grove first to register projects.\n[Initialize Grove](command:grove.init)",
+        "when": "!grove.initialized"
+      }
+    ],
+    "configuration": {
+      "title": "Grove",
+      "properties": {
+        "grove.pollingInterval": {
+          "type": "number",
+          "default": 300,
+          "description": "Seconds between PR/CI status refreshes"
+        },
+        "grove.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh PR/CI status in the background"
+        },
+        "grove.notifications.prApproved": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when a PR is approved"
+        },
+        "grove.notifications.ciFailed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when CI fails"
+        },
+        "grove.notifications.prMerged": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when a PR is merged"
+        }
+      }
+    }
+  },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
     "cli-table3": "^0.6.5",
@@ -48,6 +215,8 @@
     "@biomejs/biome": "^2.3.14",
     "@types/bun": "^1.1.0",
     "@types/react": "^19.2.13",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
     "typescript": "^5.7.0"
   }
 }
