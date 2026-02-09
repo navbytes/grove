@@ -6,7 +6,7 @@
   "description": "Manage cross-repository task workspaces with git worktrees",
   "repository": {
     "type": "git",
-    "url": "https://github.com/grove/grove-cli"
+    "url": "https://github.com/navbytes/grove"
   },
   "type": "module",
   "bin": {
