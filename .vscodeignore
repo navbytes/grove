@@ -9,5 +9,6 @@ tsconfig.json
 tsconfig.vscode.json
 esbuild.vscode.mjs
 .claude/
+.github/
 docs/
 .gitignore

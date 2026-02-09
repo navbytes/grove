@@ -2,7 +2,12 @@
   "name": "grove-cli",
   "displayName": "Grove",
   "version": "0.1.0",
+  "publisher": "grove",
   "description": "Manage cross-repository task workspaces with git worktrees",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grove/grove-cli"
+  },
   "type": "module",
   "bin": {
     "grove": "./dist/grove.js"
